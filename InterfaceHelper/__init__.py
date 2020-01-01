@@ -1,2 +1,0 @@
-from InterfaceHelper.Coco2Mask import Coco2Mask
-from InterfaceHelper.ImageLoader import ImageLoader

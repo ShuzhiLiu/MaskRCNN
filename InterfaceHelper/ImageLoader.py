@@ -1,2 +1,0 @@
-class ImageLoader:
-    pass

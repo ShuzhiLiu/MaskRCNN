@@ -47,8 +47,8 @@ class Backbone_test:
 
 
 class Backbone:
-    def __init__(self, IMG_SHAPE=(1280,720,3)):
-        # TODO: change stages to 4, current is 5
+    def __init__(self, IMG_SHAPE=(720,1280,3)):
+        # the stages of other implementation is 4, note that this ResNet50V2 has 5!
         self.base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
                                                            include_top = False)
         conv1 = tf.keras.layers.Conv2D(filters=256, kernel_size=(1, 1), padding='same')
@@ -75,8 +75,8 @@ class Backbone:
 
 
 if __name__=='__main__':
-    t1 = Backbone_test()
-    # t1.plot_model()
+    t1 = Backbone()
+    t1.plot_model()
     # print(t1.get_output_shape())
 
 
