@@ -35,7 +35,7 @@ class gen_train_target():
         bbox_outside_weight = None
 
 
-        return anchors_target, bbox_reg_target
+        return anchors_target, bbox_reg_target, bbox_inside_weight, bbox_outside_weight
 
 
     def _validate_bbox(self,image_id, bboxes):
