@@ -32,24 +32,41 @@ class bbox_tools:
         return ious
 
     @classmethod
-    def bbox_regression_target(cls, ex_boxes, gt_boxes):
+    def bbox_regression_target(cls, pred_boxes, gt_box):
         '''
         both or inputs are numpy arrays
-        :param ex_boxes: expected box (batchsize, x1, y1, x2, y2)
+        :param pred_boxes: expected box (batchsize, x1, y1, x2, y2)
         :param gt_boxes: ground truth box (batchsize, x1, y1, x2, y2)
         :return: transforms
         '''
-        reg_target = np.zeros(shape=ex_boxes.shape)
-        ex_boxes_xywh = cls.xxyy2xywh(ex_boxes)
+        gt_boxes = np.zeros(shape=pred_boxes.shape) + gt_box
+        reg_target = np.zeros(shape=pred_boxes.shape)
+        ex_boxes_xywh = cls.xxyy2xywh(pred_boxes)
         gt_boxes_xywh = cls.xxyy2xywh(gt_boxes)
 
         # The purpose of these procedure is to make sure target label in [-1,1] !!!
+        # This can be achieved only when the iou>0.7, in the case the biggest iou is still small
+        # the value will be out of [-1,1]
         reg_target[:, 0] = (gt_boxes_xywh[:, 0] - ex_boxes_xywh[:, 0]) / ex_boxes_xywh[:, 2]
         reg_target[:, 1] = (gt_boxes_xywh[:, 1] - ex_boxes_xywh[:, 1]) / ex_boxes_xywh[:, 3]
         reg_target[:, 2] = np.log(gt_boxes_xywh[:, 2] / ex_boxes_xywh[:, 2])
         reg_target[:, 3] = np.log(gt_boxes_xywh[:, 3] / ex_boxes_xywh[:, 3])
 
         return reg_target
+
+    @classmethod
+    def bbox_reg2truebox(cls, base_box, reg):
+        # input shape (N,4) , (N,4)
+        # tested
+        box_after_reg = np.zeros(shape=base_box.shape)
+        base_box_xywh = cls.xxyy2xywh(base_box)
+        box_after_reg[:,0] = reg[:,0] * base_box_xywh[:,2] + base_box_xywh[:,0]
+        box_after_reg[:,1] = reg[:,1] * base_box_xywh[:,3] + base_box_xywh[:,1]
+        box_after_reg[:,2] = np.exp(reg[:,2]) * base_box_xywh[:,2]
+        box_after_reg[:,3] = np.exp(reg[:,3]) * base_box_xywh[:,3]
+
+        box_after_reg = cls.xywh2xxyy(box_after_reg)
+        return box_after_reg
 
     @classmethod
     def bbox_transform_inv(cls, bbox, deltas):

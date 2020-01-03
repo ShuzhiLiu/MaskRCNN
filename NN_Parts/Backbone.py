@@ -1,7 +1,7 @@
 import tensorflow as tf
 import inspect
 
-class Backbone_test:
+def Backbone_test():
     IMG_SHAPE = (224, 224, 3)
     input1 = tf.keras.Input(shape=IMG_SHAPE)
     base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,

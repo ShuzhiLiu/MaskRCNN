@@ -15,6 +15,7 @@ class gen_train_target():
 
     def gen_train_target(self, image_id):
         bboxes = t1.dataset.GetOriginalBboxesList(image_id=image_id)
+        print(len(bboxes))
         bboxes_ious = []    # for each gt_bbox calculate ious with candidates
         for bbox in bboxes:
             ious = bbox_tools.ious(self.anchor_generator.anchors_candidate_list, bbox)
@@ -25,13 +26,41 @@ class gen_train_target():
             ious_temp[np.argmax(ious)] = 1
             bboxes_ious.append(ious_temp)
 
+        # for each candidate anchor, determine the anchor target
         anchors_target = np.array(bboxes_ious)
         anchors_target = np.max(anchors_target, axis=0)
         anchors_target = np.reshape(anchors_target, newshape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
         print(anchors_target.shape)
         print(anchors_target[np.where(anchors_target==1)])
-        bbox_reg_target = None
-        bbox_inside_weight = None
+        print(self.anchor_generator.anchors_candidate[np.where(anchors_target==1)])
+        self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] = self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] +100
+        print(self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)])
+
+        # for each gt_box, determine the box reg target
+        bbox_reg_target = np.zeros(shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors, 4), dtype=np.float)
+        for index, bbox_ious in enumerate(bboxes_ious):
+            ious_temp = np.reshape(bbox_ious, newshape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
+            gt_box = bboxes[index]
+            candidate_boxes = self.anchor_generator.anchors_candidate[np.where(ious_temp==1)]
+            # print(candidate_boxes,gt_box)
+            box_reg = bbox_tools.bbox_regression_target(candidate_boxes, gt_box)
+            # print(box_reg)
+            # print(bbox_tools.bbox_reg2truebox(candidate_boxes, box_reg))
+            bbox_reg_target[np.where(ious_temp==1)] = box_reg
+
+
+
+        # determine the weight
+        bbox_inside_weight = np.ones(shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors), dtype=np.float) * -1
+        print(bbox_inside_weight[np.where(anchors_target==1)])
+        bbox_inside_weight[np.where(anchors_target==1)] = bbox_inside_weight[np.where(anchors_target==1)] * 0 + 1
+        print(bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape)
+        n_zeros = bbox_inside_weight[np.where(anchors_target==0)].shape[0]
+        temp_random_choice = [-1] * (n_zeros-128) + [1] * 128
+        random.shuffle(temp_random_choice)
+        print(np.array(temp_random_choice))
+        bbox_inside_weight[np.where(anchors_target == 0)] = np.array(temp_random_choice)
+        print(bbox_inside_weight[np.where(bbox_inside_weight==1)].shape)
         bbox_outside_weight = None
 
 
@@ -61,14 +90,14 @@ class gen_train_target():
 
 
 
-BASE_PATH = '/Users/liushuzhi/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
+BASE_PATH = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
 DATASET_ID = '1945415016934'
 
 t1 = gen_train_target(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
                    imagefolder_path='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images')
 bboxes = t1.dataset.GetOriginalBboxesList(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
-# t1._validate_bbox(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474", bboxes=bboxes)
-# t1._validata_masks(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
+t1._validate_bbox(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474", bboxes=bboxes)
+t1._validata_masks(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
 t1.gen_train_target(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
 
 
