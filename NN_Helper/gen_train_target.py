@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from Data_Helper import coco_tools
 import random
 from NN_Helper import bbox_tools, gen_candidate_anchors
+import tensorflow as tf
 
 
 
@@ -53,18 +54,48 @@ class gen_train_target():
 
         # determine the weight, this will be implement in the tensorflow loss function in the future
         bbox_inside_weight = np.ones(shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors), dtype=np.float) * -1
-        print(f"[Debug INFO] Original weight in target loc: {bbox_inside_weight[np.where(anchors_target==1)]}")
+        print(f"[Debug INFO NP REF] Original weight in target loc: {bbox_inside_weight[np.where(anchors_target==1)]}")
         bbox_inside_weight[np.where(anchors_target==1)] = bbox_inside_weight[np.where(anchors_target==1)] * 0 + 1
-        print(f"[Debug INFO] Modified weight in target loc: {bbox_inside_weight[np.where(anchors_target == 1)]}")
-        print(f"[Debug INFO] Number of foreground : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
+        print(f"[Debug INFO NP REF] Modified weight in target loc: {bbox_inside_weight[np.where(anchors_target == 1)]}")
+        print(f"[Debug INFO NP REF] Number of foreground : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
         n_zeros = bbox_inside_weight[np.where(anchors_target==0)].shape[0]
         temp_random_choice = [-1] * (n_zeros-128) + [1] * 128
         random.shuffle(temp_random_choice)
         # print(np.array(temp_random_choice))
         bbox_inside_weight[np.where(anchors_target == 0)] = np.array(temp_random_choice)
-        print(f"[Debug INFO] Number of foreground + 128 random chose background : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
+        print(f"[Debug INFO NP REF] Number of foreground + 128 random chose background : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
         bbox_outside_weight = None
 
+        # test tensorflow
+        bbox_inside_weight = tf.ones(
+            shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors)) * -1
+        indices_foreground = tf.where(tf.equal(anchors_target, 1))
+        n_foreground = indices_foreground.get_shape().as_list()[0]
+        print(f"[Debug INFO TF TEST] Original weight in target loc: {tf.gather_nd(params=bbox_inside_weight, indices=indices_foreground)}")
+        bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_foreground, updates=[1]*len(indices_foreground))
+        print(f"[Debug INFO TF TEST] Modified weight in target loc: {tf.gather_nd(params=bbox_inside_weight, indices=indices_foreground)}")
+        print(f"[Debug INFO TF TEST] Number of foreground : {len(indices_foreground)}")
+        indices_background = tf.where(tf.equal(anchors_target, 0))
+        print(indices_background.get_shape().as_list())
+        n_background = indices_background.get_shape().as_list()[0]
+        print(n_background)
+        selected_ratio = n_foreground/n_background
+        remain_ration = (n_background-n_foreground)/n_background
+        print(selected_ratio, remain_ration)
+        # temp_random_choice = tf.random.categorical(tf.math.log([[remain_ration, selected_ratio]]), n_background)
+        # temp_random_choice = tf.reshape(temp_random_choice, (-1,))
+        # temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
+
+        temp_random_choice = tf.random.categorical(tf.math.log([[remain_ration, selected_ratio]]), 23*40*9)
+        temp_random_choice = tf.reshape(temp_random_choice, (23,40,9))
+        temp_random_choice = tf.gather_nd(temp_random_choice, indices_background)
+        temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
+        # print(np.array(temp_random_choice))
+        bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_background, updates=temp_random_choice)
+        indices_train = tf.where(tf.equal(bbox_inside_weight, 1))
+
+        print(
+            f"[Debug INFO TF TEST] Number of foreground + {n_foreground} random chose background : {len(indices_train)}")
 
         return anchors_target, bbox_reg_target, bbox_inside_weight, bbox_outside_weight
 
