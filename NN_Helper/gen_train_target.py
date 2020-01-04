@@ -15,7 +15,7 @@ class gen_train_target():
 
     def gen_train_target(self, image_id):
         bboxes = t1.dataset.GetOriginalBboxesList(image_id=image_id)
-        print(len(bboxes))
+        print(f"[Debug INFO] Number of total gt bboxes :{len(bboxes)}")
         bboxes_ious = []    # for each gt_bbox calculate ious with candidates
         for bbox in bboxes:
             ious = bbox_tools.ious(self.anchor_generator.anchors_candidate_list, bbox)
@@ -30,11 +30,12 @@ class gen_train_target():
         anchors_target = np.array(bboxes_ious)
         anchors_target = np.max(anchors_target, axis=0)
         anchors_target = np.reshape(anchors_target, newshape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
-        print(anchors_target.shape)
-        print(anchors_target[np.where(anchors_target==1)])
-        print(self.anchor_generator.anchors_candidate[np.where(anchors_target==1)])
-        self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] = self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] +100
-        print(self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)])
+        print(f"[Debug INFO] Number of total target anchors: {anchors_target[np.where(anchors_target==1)].shape[0]}")
+        print(f"[Debug INFO] Shape of anchors_target: {anchors_target.shape}")
+        print(f"[Debug INFO] Selected anchors: \n {self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)]}")
+        # test
+        # self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] = self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] +100
+        # print(f"Selected anchors: \n {self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)]}")
 
         # for each gt_box, determine the box reg target
         bbox_reg_target = np.zeros(shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors, 4), dtype=np.float)
@@ -50,17 +51,18 @@ class gen_train_target():
 
 
 
-        # determine the weight
+        # determine the weight, this will be implement in the tensorflow loss function in the future
         bbox_inside_weight = np.ones(shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors), dtype=np.float) * -1
-        print(bbox_inside_weight[np.where(anchors_target==1)])
+        print(f"[Debug INFO] Original weight in target loc: {bbox_inside_weight[np.where(anchors_target==1)]}")
         bbox_inside_weight[np.where(anchors_target==1)] = bbox_inside_weight[np.where(anchors_target==1)] * 0 + 1
-        print(bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape)
+        print(f"[Debug INFO] Modified weight in target loc: {bbox_inside_weight[np.where(anchors_target == 1)]}")
+        print(f"[Debug INFO] Number of foreground : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
         n_zeros = bbox_inside_weight[np.where(anchors_target==0)].shape[0]
         temp_random_choice = [-1] * (n_zeros-128) + [1] * 128
         random.shuffle(temp_random_choice)
-        print(np.array(temp_random_choice))
+        # print(np.array(temp_random_choice))
         bbox_inside_weight[np.where(anchors_target == 0)] = np.array(temp_random_choice)
-        print(bbox_inside_weight[np.where(bbox_inside_weight==1)].shape)
+        print(f"[Debug INFO] Number of foreground + 128 random chose background : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
         bbox_outside_weight = None
 
 
@@ -91,22 +93,23 @@ class gen_train_target():
 
 
 BASE_PATH = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
-DATASET_ID = '1945415016934'
-
+imagefolder_path='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
+DATASET_ID = '1940091026744'
+image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
 t1 = gen_train_target(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
-                   imagefolder_path='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images')
-bboxes = t1.dataset.GetOriginalBboxesList(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
-t1._validate_bbox(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474", bboxes=bboxes)
-t1._validata_masks(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
-t1.gen_train_target(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
+                   imagefolder_path=imagefolder_path)
+bboxes = t1.dataset.GetOriginalBboxesList(image_id=image_id)
+# t1._validate_bbox(image_id=image_id, bboxes=bboxes)
+# t1._validata_masks(image_id=image_id)
+t1.gen_train_target(image_id=image_id)
 
 
 def test():
     data1 = coco_tools(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
-                       imagefolder_path='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images')
-    img1 = data1.GetOriginalImage(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
+                       imagefolder_path=imagefolder_path)
+    img1 = data1.GetOriginalImage(image_id=image_id)
     print(data1.images)
-    bboxes = data1.GetOriginalBboxesList(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
+    bboxes = data1.GetOriginalBboxesList(image_id=image_id)
     print(bboxes)
     # img1 = np.zeros(shape=(720,1280,3), dtype=np.uint8)
     for bbox in bboxes:

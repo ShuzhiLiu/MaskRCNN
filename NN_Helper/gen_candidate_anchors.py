@@ -3,7 +3,7 @@ import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
 import random
-
+from Debugger import DebugPrint
 class gen_candidate_anchors:
     def __init__(self, img_shape=(720,1280), n_stage=5):
         self.img_shape = img_shape
@@ -53,17 +53,17 @@ class gen_candidate_anchors:
 
 if __name__=='__main__':
     t1 = gen_candidate_anchors()
-    print(t1.base_anchors)
-    print(t1.anchors_candidate[0, 0, :, :])
-    print(t1.anchors_candidate[10, 10, :, :])
+    DebugPrint("base anchors", t1.base_anchors)
+    DebugPrint("9 Anchors candidate at [0,0]", t1.anchors_candidate[0, 0, :, :])
+    DebugPrint("9 Anchors candidate at [10,10]", t1.anchors_candidate[10, 10, :, :])
     # bboxes = [t1.anchors_candidate[10, 10, i, :] for i in range(9)]
     bboxes = t1.anchors_candidate[13, 22, :, :].tolist()
     t1._validate_bbox([bboxes[6]])
     # print(t1.all_anchors[23,40,:,:])
-    print(t1.anchors_candidate[0,0,2,:])
+    DebugPrint("1 Anchor candidate at [0,0,2]", t1.anchors_candidate[0,0,2,:])
     # temp = t1.anchors_candidate.reshape((-1, 4))
     temp = np.reshape(t1.anchors_candidate, newshape=(-1,4))
-    print(temp[2,:])
+    DebugPrint("Same with Anchor candidate at [0,0,2] after reshape", temp[2,:])
     temp2 = temp.reshape((23,40,9,4))
-    print(temp2[0,0,2,:])
-    print(t1.anchors_candidate_list[2])
+    DebugPrint("Same with temp[2,:] after reshape", temp2[0,0,2,:])
+    DebugPrint("Same anchor in anchor list", t1.anchors_candidate_list[2])
