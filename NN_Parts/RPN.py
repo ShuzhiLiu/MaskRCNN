@@ -2,6 +2,7 @@ import tensorflow as tf
 from NN_Parts import Backbone
 import random
 import numpy as np
+from Debugger import DebugPrint
 
 
 class RPN:
@@ -37,6 +38,8 @@ class RPN:
 
         tf.keras.utils.plot_model(model=self.RPN_model, to_file='RPN_with_backbone.png', show_shapes=True)
 
+        self._RPN_train_model()
+
     def _RPN_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
         self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression, name='RPN_BBOX_Regression_Target')
@@ -50,7 +53,7 @@ class RPN:
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
                                                             anchor_pred=self.RPN_Anchor_Pred,
                                                             bbox_reg_pred=self.RPN_BBOX_Regression_Pred))
-        # self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam())
+        self.RPN_train_model.compile(optimizer=tf.keras.optimizers.SGD())
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
 
@@ -59,23 +62,22 @@ class RPN:
         bbox_inside_weight = tf.ones(shape=(1,self.shape_Anchor_Target[0],self.shape_Anchor_Target[1],self.shape_Anchor_Target[2]), dtype=tf.float32) * -1
 
         indices_foreground = tf.where(tf.equal(anchor_target, 1))
-        print(indices_foreground)
+        # DebugPrint('indices_foreground', indices_foreground)
         n_foreground = tf.gather_nd(tf.shape(indices_foreground), [[0]])
+        # DebugPrint('n_foreground', n_foreground)
 
         bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_foreground,
                                                          updates=tf.ones(shape=n_foreground))
 
         indices_background = tf.where(tf.equal(anchor_target, 0.0))
-        print(indices_background)
+        # DebugPrint('indices_background', indices_background)
         n_background = tf.gather_nd(tf.shape(indices_background), [[0]])
-        print(n_foreground,n_background)
 
         # balance the foreground and background training sample
         selected_ratio = n_foreground / self.N_total_anchors
         remain_ratio = (self.N_total_anchors - n_foreground) / self.N_total_anchors
         concat = tf.concat([remain_ratio, selected_ratio], axis=0)
         concat = tf.reshape(concat, (1,2))
-        print(selected_ratio, remain_ratio)
         temp_random_choice = tf.random.categorical(tf.math.log(concat), self.N_total_anchors)
         temp_random_choice = tf.reshape(temp_random_choice, (1,self.shape_Anchor_Target[0],self.shape_Anchor_Target[1],self.shape_Anchor_Target[2]))
         temp_random_choice = tf.gather_nd(params=temp_random_choice, indices=indices_background)
@@ -86,16 +88,16 @@ class RPN:
 
         indices_train = tf.where(tf.equal(bbox_inside_weight, 1.0))
 
+        # print(anchor_target)
+        # print(anchor_pred)
         anchor_target = tf.gather_nd(params=anchor_target, indices=indices_train)
         anchor_pred = tf.gather_nd(params=anchor_pred, indices=indices_train)
         bbox_reg_target = tf.gather_nd(params=bbox_reg_target, indices=indices_train)
         bbox_reg_pred = tf.gather_nd(params=bbox_reg_pred, indices=indices_train)
 
         anchor_loss = tf.losses.sparse_categorical_crossentropy(y_true=anchor_target, y_pred=anchor_pred)
-        anchor_loss = tf.math.multiply(anchor_loss, bbox_inside_weight)
         Huberloss = tf.losses.Huber()
         bbox_reg_loss = Huberloss(y_true=bbox_reg_target, y_pred=bbox_reg_pred)
-        bbox_reg_loss = tf.math.multiply(bbox_reg_loss, bbox_inside_weight)
         total_loss = tf.add(anchor_loss, bbox_reg_loss)
         total_loss = tf.math.reduce_mean(total_loss)
 

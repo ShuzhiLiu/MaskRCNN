@@ -14,9 +14,10 @@ class coco_tools:
         self.annotations = dict1["annotations"]
         self.categories = dict1["categories"]
         self.segment_info = dict1["segment_info"]
-        self.image_ids = set()
+        self.image_ids = []
         for image in self.images:
-            self.image_ids.add(image['id'])
+            if image['id'] not in self.image_ids:
+                self.image_ids.append(image['id'])
 
 
 
@@ -69,7 +70,7 @@ class coco_tools:
         if show:
             plt.show()
         if savefile:
-            plt.savefig(f'{os.getcwd()}/Images_Drawn/{image_id}.jpg', dpi=300)
+            plt.savefig(f'{os.getcwd()}/Images_Drawn/11111111111.jpg', dpi=300)
 
     def GetSegmMaskFromAnnoCOCO(self, annos, image_id):
         segms = []
@@ -101,9 +102,10 @@ class coco_tools:
         self.annotations = dict1["annotations"]
         self.categories = dict1["categories"]
         self.segment_info = dict1["segment_info"]
-        self.image_ids = set()
+        self.image_ids = []
         for image in self.images:
-            self.image_ids.add(image['id'])
+            if image['id'] not in self.image_ids:
+                self.image_ids.append(image['id'])
 
     def GetOriginalImage(self,image_id):
         image_name = self.GetImageName(image_id)
