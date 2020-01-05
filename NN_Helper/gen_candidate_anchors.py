@@ -13,8 +13,8 @@ class gen_candidate_anchors:
         self.h = int(img_shape[0]/self.n_stage_revert_factor) + int((img_shape[0]%self.n_stage_revert_factor)>0)
         self.w = int(img_shape[1]/self.n_stage_revert_factor) + int((img_shape[1]%self.n_stage_revert_factor)>0)
         self.n_anchors = 9
-        self.anchors_candidate = self.gen_all_candidate_anchors(self.h, self.w, self.n_anchors, img_shape)
-        self.anchors_candidate_list = list(np.reshape(self.anchors_candidate, newshape=(-1, 4)).tolist())
+        self.anchor_candidates = self.gen_all_candidate_anchors(self.h, self.w, self.n_anchors, img_shape)
+        self.anchor_candidates_list = list(np.reshape(self.anchor_candidates, newshape=(-1, 4)).tolist())
 
 
     def gen_all_candidate_anchors(self, h, w, num_anchors, image_shape):
@@ -54,16 +54,16 @@ class gen_candidate_anchors:
 if __name__=='__main__':
     t1 = gen_candidate_anchors()
     DebugPrint("base anchors", t1.base_anchors)
-    DebugPrint("9 Anchors candidate at [0,0]", t1.anchors_candidate[0, 0, :, :])
-    DebugPrint("9 Anchors candidate at [10,10]", t1.anchors_candidate[10, 10, :, :])
+    DebugPrint("9 Anchors candidate at [0,0]", t1.anchor_candidates[0, 0, :, :])
+    DebugPrint("9 Anchors candidate at [10,10]", t1.anchor_candidates[10, 10, :, :])
     # bboxes = [t1.anchors_candidate[10, 10, i, :] for i in range(9)]
-    bboxes = t1.anchors_candidate[13, 22, :, :].tolist()
+    bboxes = t1.anchor_candidates[13, 22, :, :].tolist()
     t1._validate_bbox([bboxes[6]])
     # print(t1.all_anchors[23,40,:,:])
-    DebugPrint("1 Anchor candidate at [0,0,2]", t1.anchors_candidate[0,0,2,:])
+    DebugPrint("1 Anchor candidate at [0,0,2]", t1.anchor_candidates[0, 0, 2, :])
     # temp = t1.anchors_candidate.reshape((-1, 4))
-    temp = np.reshape(t1.anchors_candidate, newshape=(-1,4))
+    temp = np.reshape(t1.anchor_candidates, newshape=(-1, 4))
     DebugPrint("Same with Anchor candidate at [0,0,2] after reshape", temp[2,:])
     temp2 = temp.reshape((23,40,9,4))
     DebugPrint("Same with temp[2,:] after reshape", temp2[0,0,2,:])
-    DebugPrint("Same anchor in anchor list", t1.anchors_candidate_list[2])
+    DebugPrint("Same anchor in anchor list", t1.anchor_candidates_list[2])

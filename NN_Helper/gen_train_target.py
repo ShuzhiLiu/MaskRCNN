@@ -11,15 +11,15 @@ import tensorflow as tf
 
 class gen_train_target():
     def __init__(self, file, imagefolder_path, img_shape=(720,1280), n_stage=5):
-        self.dataset = coco_tools(file, imagefolder_path)
+        self.dataset_coco = coco_tools(file, imagefolder_path)
         self.anchor_generator = gen_candidate_anchors(img_shape=img_shape, n_stage=n_stage)
 
     def gen_train_target(self, image_id, debuginfo=False):
-        bboxes = self.dataset.GetOriginalBboxesList(image_id=image_id)
+        bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
 
         bboxes_ious = []    # for each gt_bbox calculate ious with candidates
         for bbox in bboxes:
-            ious = bbox_tools.ious(self.anchor_generator.anchors_candidate_list, bbox)
+            ious = bbox_tools.ious(self.anchor_generator.anchor_candidates_list, bbox)
             ious_temp = np.ones(shape=(len(ious)), dtype=np.float) * 0.5
             # other author's implementations are use -1 to indicate ignoring, here use 0.5 to use max
             ious_temp = np.where(np.asarray(ious)>0.7, 1, ious_temp)
@@ -35,7 +35,7 @@ class gen_train_target():
             print(f"[Debug INFO] Number of total gt bboxes :{len(bboxes)}")
             print(f"[Debug INFO] Number of total target anchors: {anchors_target[np.where(anchors_target==1)].shape[0]}")
             print(f"[Debug INFO] Shape of anchors_target: {anchors_target.shape}")
-            print(f"[Debug INFO] Selected anchors: \n {self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)]}")
+            print(f"[Debug INFO] Selected anchors: \n {self.anchor_generator.anchor_candidates[np.where(anchors_target == 1)]}")
         # test
         # self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] = self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] +100
         # print(f"Selected anchors: \n {self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)]}")
@@ -45,7 +45,7 @@ class gen_train_target():
         for index, bbox_ious in enumerate(bboxes_ious):
             ious_temp = np.reshape(bbox_ious, newshape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
             gt_box = bboxes[index]
-            candidate_boxes = self.anchor_generator.anchors_candidate[np.where(ious_temp==1)]
+            candidate_boxes = self.anchor_generator.anchor_candidates[np.where(ious_temp == 1)]
             # print(candidate_boxes,gt_box)
             box_reg = bbox_tools.bbox_regression_target(candidate_boxes, gt_box)
             # print(box_reg)
@@ -101,14 +101,41 @@ class gen_train_target():
 
         return anchors_target, bbox_reg_target
 
+    def gen_true_bbox_candidates(self, image_id, debuginfo=False):
+        bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
+
+        bboxes_ious = []    # for each gt_bbox calculate ious with candidates
+        for bbox in bboxes:
+            ious = bbox_tools.ious(self.anchor_generator.anchor_candidates_list, bbox)
+            ious_temp = np.ones(shape=(len(ious)), dtype=np.float) * 0.5
+            # other author's implementations are use -1 to indicate ignoring, here use 0.5 to use max
+            ious_temp = np.where(np.asarray(ious)>0.7, 1, ious_temp)
+            ious_temp = np.where(np.asarray(ious)<0.3, 0, ious_temp)
+            ious_temp[np.argmax(ious)] = 1
+            bboxes_ious.append(ious_temp)
+
+
+
+
+        # for each gt_box, determine the box reg target
+        true_bboxes = []
+        for index, bbox_ious in enumerate(bboxes_ious):
+            ious_temp = np.reshape(bbox_ious, newshape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
+            candidate_boxes = self.anchor_generator.anchor_candidates[np.where(ious_temp == 1)]
+            n = candidate_boxes.shape[0]
+            for i in range(n):
+                true_bboxes.append(candidate_boxes[i])
+        return true_bboxes
+
+
     def gen_train_input(self, image_id):
-        return self.dataset.GetOriginalImage(image_id=image_id)
+        return self.dataset_coco.GetOriginalImage(image_id=image_id)
 
     def gen_train_data(self):
         inputs = []
         anchor_targets = []
         bbox_targets = []
-        for image_id in self.dataset.image_ids:
+        for image_id in self.dataset_coco.image_ids:
             inputs.append(self.gen_train_input(image_id))
             anchor_target, bbox_target = self.gen_train_target(image_id)
             anchor_targets.append(anchor_target)
@@ -117,7 +144,7 @@ class gen_train_target():
 
 
     def _validate_bbox(self,image_id, bboxes):
-        img1 = self.dataset.GetOriginalImage(image_id=image_id)
+        img1 = self.dataset_coco.GetOriginalImage(image_id=image_id)
         for bbox in bboxes:
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             img1 = cv.rectangle(img1, (bbox[1], bbox[0]), (bbox[3], bbox[2]), color, 4)
@@ -125,9 +152,9 @@ class gen_train_target():
         plt.show()
 
     def _validata_masks(self, image_id):
-        img1 = self.dataset.GetOriginalImage(image_id=image_id)
+        img1 = self.dataset_coco.GetOriginalImage(image_id=image_id)
         temp_img = np.zeros(shape=img1.shape, dtype=np.uint8)
-        Masks = self.dataset.GetOriginalSegmsMaskList(image_id=image_id)
+        Masks = self.dataset_coco.GetOriginalSegmsMaskList(image_id=image_id)
         for mask in Masks:
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             temp_img[:, :, 0][mask.astype(bool)] = color[0]
@@ -146,7 +173,7 @@ def test2():
     image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
     t1 = gen_train_target(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
                        imagefolder_path=imagefolder_path)
-    bboxes = t1.dataset.GetOriginalBboxesList(image_id=image_id)
+    bboxes = t1.dataset_coco.GetOriginalBboxesList(image_id=image_id)
     t1._validate_bbox(image_id=image_id, bboxes=bboxes)
     t1._validata_masks(image_id=image_id)
     t1.gen_train_target(image_id=image_id)
@@ -170,8 +197,8 @@ def test():
     plt.show()
 
     g1 = gen_candidate_anchors()
-    print(len(g1.anchors_candidate_list))
-    ious = bbox_tools.ious(g1.anchors_candidate_list, bboxes[0])
+    print(len(g1.anchor_candidates_list))
+    ious = bbox_tools.ious(g1.anchor_candidates_list, bboxes[0])
     ious[np.argmax(ious)] = 1
     print(len(ious))
     ious_np = np.reshape(ious, newshape=(23,40,9))

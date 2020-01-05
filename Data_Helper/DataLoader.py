@@ -29,5 +29,5 @@ plt.imshow(img1)
 plt.show()
 
 g1 = gen_candidate_anchors()
-ious = bbox_tools.ious(g1.anchors_candidate_list, bboxes[0])
+ious = bbox_tools.ious(g1.anchor_candidates_list, bboxes[0])
 print(ious)

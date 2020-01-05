@@ -55,14 +55,15 @@ class coco_tools:
             plt.savefig(f'{os.getcwd()}/Images_Drawn/{image_id}.jpg', dpi=300)
 
     def DrawBboxes(self, Original_Image, Bboxes, show=False, savefile=False):
+        # bbox is numpy format (x1, y1, x2, y2)
         height, width = Original_Image.shape[0], Original_Image.shape[1]
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
-        for bbox in range(Bboxes):
+        for bbox in Bboxes:
             color_random = np.random.randint(0, 256, (1, 3), dtype=np.uint8)
             color_random2 = color_random.tolist()
             cv2.rectangle(tempimg,
-                          (bbox[0], bbox[1]),
-                          (bbox[0] + bbox[2], bbox[1] + bbox[3]),
+                          (bbox[1], bbox[0]),
+                          (bbox[3], bbox[2]),
                           color_random2[0],
                           2)
         Original_Image = (Original_Image * 0.5 + tempimg * 0.5).astype(np.uint8)
