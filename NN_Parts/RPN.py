@@ -53,7 +53,7 @@ class RPN:
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
                                                             anchor_pred=self.RPN_Anchor_Pred,
                                                             bbox_reg_pred=self.RPN_BBOX_Regression_Pred))
-        self.RPN_train_model.compile(optimizer=tf.keras.optimizers.SGD(learning_rate=0.01, momentum=0.9))
+        self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001))
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
 

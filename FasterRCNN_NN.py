@@ -14,8 +14,10 @@ class FasterRCNN():
         self.RPN_model = self.RPN.RPN_model
         self.RPN_train_model = self.RPN.RPN_train_model
 
-        BASE_PATH = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
-        imagefolder_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
+        # BASE_PATH = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
+        # imagefolder_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
+        BASE_PATH = '/home/liushuzhi/Documents/mmdetection_tools/data'
+        imagefolder_path = '/home/liushuzhi/Documents/mmdetection_tools/LocalData_Images'
         DATASET_ID = '1940091026744'
         image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
         self.train_data_generator = gen_train_target(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
@@ -53,7 +55,7 @@ class FasterRCNN():
         shape1 = tf.shape(RPN_Anchor_Pred)
         print(RPN_Anchor_Pred.shape, RPN_BBOX_Regression_Pred.shape)
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, (-1,))
-        n_anchor_proposal = 10
+        n_anchor_proposal = 30
         top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred, n_anchor_proposal)
         DebugPrint('top values', top_values)
 
@@ -107,7 +109,7 @@ class FasterRCNN():
         inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data()
         self.RPN_train_model.fit([inputs, anchor_targets, bbox_targets],
                                  batch_size=1,
-                                 epochs=12)
+                                 epochs=24)
 
 
 
@@ -123,4 +125,3 @@ if __name__=='__main__':
     f1.test_proposal_visualization()
     f1.train()
     f1.test_proposal_visualization()
-        
