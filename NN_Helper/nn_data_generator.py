@@ -9,7 +9,7 @@ import tensorflow as tf
 
 
 
-class gen_train_target():
+class NN_data_generator():
     def __init__(self, file, imagefolder_path, img_shape=(720,1280), n_stage=5):
         self.dataset_coco = coco_tools(file, imagefolder_path)
         self.anchor_generator = gen_candidate_anchors(img_shape=img_shape, n_stage=n_stage)
@@ -171,8 +171,8 @@ def test2():
     imagefolder_path='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
     DATASET_ID = '1940091026744'
     image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
-    t1 = gen_train_target(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
-                       imagefolder_path=imagefolder_path)
+    t1 = NN_data_generator(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
+                           imagefolder_path=imagefolder_path)
     bboxes = t1.dataset_coco.GetOriginalBboxesList(image_id=image_id)
     t1._validate_bbox(image_id=image_id, bboxes=bboxes)
     t1._validata_masks(image_id=image_id)

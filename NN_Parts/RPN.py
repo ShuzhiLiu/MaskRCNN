@@ -20,6 +20,7 @@ class RPN:
         self.reshape2 = tf.keras.layers.Reshape(
             target_shape=(back_outshape[0], back_outshape[1], int(18 / 2), 2))(self.ac2)
         self.RPN_Anchor_Pred = tf.nn.softmax(logits=self.reshape2, axis=-1, name='RPN_Anchor_Pred')
+        # [1,0] is background, [0,1] is foreground. second channel is true.
 
         # bounding box regression
         self.conv3 = tf.keras.layers.Conv2D(filters=36, kernel_size=(1, 1), padding='same', kernel_initializer='he_normal')(self.ac1)

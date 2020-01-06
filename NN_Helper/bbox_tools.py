@@ -2,8 +2,8 @@ import numpy as np
 
 
 class bbox_tools:
-
-
+    # Beside ious, format of boxes is numpy.
+    # format of boxes is list for ious
     @classmethod
     def ious(cls, boxes_list, box_1target):
         # box axis format: (x1,y1,x2,y2)
@@ -55,19 +55,50 @@ class bbox_tools:
         return reg_target
 
     @classmethod
-    def bbox_reg2truebox(cls, base_box, reg):
+    def bbox_reg2truebox(cls, base_boxes, regs):
         # input shape (N,4) , (N,4)
         # tested
-        box_after_reg = np.zeros(shape=base_box.shape)
-        base_box_xywh = cls.xxyy2xywh(base_box)
-        box_after_reg[:,0] = reg[:,0] * base_box_xywh[:,2] + base_box_xywh[:,0]
-        box_after_reg[:,1] = reg[:,1] * base_box_xywh[:,3] + base_box_xywh[:,1]
-        box_after_reg[:,2] = np.exp(reg[:,2]) * base_box_xywh[:,2]
-        box_after_reg[:,3] = np.exp(reg[:,3]) * base_box_xywh[:,3]
+        box_after_reg = np.zeros(shape=base_boxes.shape)
+        base_box_xywh = cls.xxyy2xywh(base_boxes)
+        box_after_reg[:, 0] = regs[:, 0] * base_box_xywh[:, 2] + base_box_xywh[:, 0]
+        box_after_reg[:, 1] = regs[:, 1] * base_box_xywh[:, 3] + base_box_xywh[:, 1]
+        box_after_reg[:, 2] = np.exp(regs[:, 2]) * base_box_xywh[:, 2]
+        box_after_reg[:, 3] = np.exp(regs[:, 3]) * base_box_xywh[:, 3]
 
         box_after_reg = cls.xywh2xxyy(box_after_reg)
         return box_after_reg
 
+    @classmethod
+    def xxyy2xywh(cls, boxes):
+        xywh = np.zeros(shape=boxes.shape)
+        xywh[:, 2] = boxes[:, 2] - boxes[:, 0] + 1
+        xywh[:, 3] = boxes[:, 3] - boxes[:, 1] + 1
+        xywh[:, 0] = boxes[:, 0] + xywh[:, 2] / 2
+        xywh[:, 1] = boxes[:, 1] + xywh[:, 3] / 2
+
+        return xywh.astype(np.int)
+
+    @classmethod
+    def xywh2xxyy(cls, boxes):
+        xyxy = np.zeros(shape=boxes.shape)
+        xyxy[:, 0] = boxes[:, 0] - (boxes[:, 2] - 1) / 2
+        xyxy[:, 1] = boxes[:, 1] - (boxes[:, 3] - 1) / 2
+        xyxy[:, 2] = boxes[:, 0] + (boxes[:, 2] - 1) / 2
+        xyxy[:, 3] = boxes[:, 1] + (boxes[:, 3] - 1) / 2
+
+        return xyxy.astype(np.int)
+
+    @classmethod
+    def clip_boxes(cls, boxes, IMG_SHAPE):
+        x_max, y_max = IMG_SHAPE[0], IMG_SHAPE[1]
+        boxes[:, 0][boxes[:, 0] < 0] = 0
+        boxes[:, 1][boxes[:, 1] < 0] = 0
+        boxes[:, 2][boxes[:, 2] > x_max] = x_max
+        boxes[:, 3][boxes[:, 3] > y_max] = y_max
+
+        return boxes
+
+    # Belows are not used
     @classmethod
     def bbox_transform_inv(cls, bbox, deltas):
         bbox_xywh = cls.xxyy2xywh(bbox)
@@ -115,14 +146,7 @@ class bbox_tools:
 
         return pred_boxes
 
-    @classmethod
-    def clip_boxes(cls, boxes, im_info):
-        boxes[:, 0::4].clamp_(0, im_info[1] - 1)
-        boxes[:, 1::4].clamp_(0, im_info[0] - 1)
-        boxes[:, 2::4].clamp_(0, im_info[1] - 1)
-        boxes[:, 3::4].clamp_(0, im_info[0] - 1)
 
-        return boxes
 
     @classmethod
     def clip_boxes_cls(cls, boxes, im_shape):
@@ -132,26 +156,6 @@ class bbox_tools:
         boxes[:, 3::4].clamp_(0, im_shape[0] - 1)
 
         return boxes
-
-    @classmethod
-    def xxyy2xywh(cls, boxes):
-        xywh = np.zeros(shape=boxes.shape)
-        xywh[:, 2] = boxes[:, 2] - boxes[:, 0] + 1
-        xywh[:, 3] = boxes[:, 3] - boxes[:, 1] + 1
-        xywh[:, 0] = boxes[:, 0] + xywh[:, 2] / 2
-        xywh[:, 1] = boxes[:, 1] + xywh[:, 3] / 2
-
-        return xywh.astype(np.int)
-
-    @classmethod
-    def xywh2xxyy(cls, boxes):
-        xyxy = np.zeros(shape=boxes.shape)
-        xyxy[:, 0] = boxes[:, 0] - (boxes[:, 2] - 1) / 2
-        xyxy[:, 1] = boxes[:, 1] - (boxes[:, 3] - 1) / 2
-        xyxy[:, 2] = boxes[:, 0] + (boxes[:, 2] - 1) / 2
-        xyxy[:, 3] = boxes[:, 1] + (boxes[:, 3] - 1) / 2
-
-        return xyxy.astype(np.int)
 
 
 if __name__ == '__main__':
