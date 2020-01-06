@@ -7,7 +7,7 @@ from Debugger import DebugPrint
 
 
 class FasterRCNN():
-    def __init__(self,IMG_SHAPE=(720, 1280, 3)):
+    def __init__(self, IMG_SHAPE=(720, 1280, 3)):
         b1 = Backbone(IMG_SHAPE=IMG_SHAPE)
         self.IMG_SHAPE = IMG_SHAPE
         self.backbone_model = b1.backbone_model
@@ -25,20 +25,19 @@ class FasterRCNN():
                                                       imagefolder_path=imagefolder_path)
         self.cocotool = self.train_data_generator.dataset_coco
 
-        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0],IMG_SHAPE[1]))
+        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]))
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
 
-
     def test_loss_function(self):
-        inputs, anchor_targets, bbox_targets =self.train_data_generator.gen_train_data()
+        inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data()
         print(inputs.shape, anchor_targets.shape, bbox_targets.shape)
-        input1 = np.reshape(inputs[0,:,:,:], (1, 720, 1280, 3))
-        anchor1 = np.reshape(anchor_targets[0,:,:,:], (1, 23, 40, 9))
+        input1 = np.reshape(inputs[0, :, :, :], (1, 720, 1280, 3))
+        anchor1 = np.reshape(anchor_targets[0, :, :, :], (1, 23, 40, 9))
         anchor2 = tf.convert_to_tensor(anchor1)
         anchor2 = tf.dtypes.cast(anchor2, tf.int32)
         anchor2 = tf.one_hot(anchor2, 2, axis=-1)
         print(anchor1)
-        bbox1 = np.reshape(bbox_targets[0,:,:,:,:], (1, 23, 40, 9, 4))
+        bbox1 = np.reshape(bbox_targets[0, :, :, :, :], (1, 23, 40, 9, 4))
         loss = self.RPN._RPN_loss(anchor1, bbox1, anchor2, bbox1)
         print(loss)
 
@@ -52,12 +51,14 @@ class FasterRCNN():
 
         # === Selection part ===
         # top_values, top_indices = tf.math.top_k()
-        RPN_Anchor_Pred = tf.slice(RPN_Anchor_Pred, [0,0,0,0,1], [1,23,40,9,1]) # second channel is foreground
+        RPN_Anchor_Pred = tf.slice(RPN_Anchor_Pred, [0, 0, 0, 0, 1], [1, 23, 40, 9, 1])  # second channel is foreground
         print(RPN_Anchor_Pred.shape, RPN_BBOX_Regression_Pred.shape)
+        # squeeze the pred of anchor and bbox_reg
         RPN_Anchor_Pred = tf.squeeze(RPN_Anchor_Pred)
         RPN_BBOX_Regression_Pred = tf.squeeze(RPN_BBOX_Regression_Pred)
         shape1 = tf.shape(RPN_Anchor_Pred)
         print(RPN_Anchor_Pred.shape, RPN_BBOX_Regression_Pred.shape)
+        # flatten the pred of anchor to get top N values and indices
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, (-1,))
         n_anchor_proposal = 30
         top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred, n_anchor_proposal)
@@ -66,21 +67,18 @@ class FasterRCNN():
         # test_indices = tf.where(tf.greater(tf.reshape(RPN_Anchor_Pred, (-1,)), 0.9))
         # print(test_indices)
 
-        top_indices = tf.reshape(top_indices, (-1,1))
-
-
-
+        top_indices = tf.reshape(top_indices, (-1, 1))
         DebugPrint('top indices', top_indices)
+
+        # flatten the bbox_reg by last dim to use top_indices to get final_box_reg
         RPN_BBOX_Regression_Pred_shape = tf.shape(RPN_BBOX_Regression_Pred)
         RPN_BBOX_Regression_Pred = tf.reshape(RPN_BBOX_Regression_Pred, (-1, RPN_BBOX_Regression_Pred_shape[-1]))
         DebugPrint('RPN_BBOX_Regression_Pred shape', RPN_BBOX_Regression_Pred.shape)
         final_box_reg = tf.gather_nd(RPN_BBOX_Regression_Pred, top_indices)
         DebugPrint('final box reg values', final_box_reg)
 
-        # Need to delete these two lines
+        # Convert to numpy to plot
         final_box_reg = np.array(final_box_reg)
-        final_box_reg = final_box_reg / np.max(np.abs(final_box_reg))
-
         DebugPrint('final box reg shape', final_box_reg.shape)
 
         update_value = [2] * n_anchor_proposal
@@ -94,27 +92,19 @@ class FasterRCNN():
         DebugPrint('base_boxes', base_boxes)
         base_boxes = np.array(base_boxes)
 
-
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
 
         # Need to convert above instructions to tf operations
 
         # === visualization part ===
-
         # clip the boxes to make sure they are legal boxes
-        x_max, y_max = self.IMG_SHAPE[0], self.IMG_SHAPE[1]
-        final_box[:, 0][final_box[:, 0] < 0] = 0
-        final_box[:, 1][final_box[:, 1] < 0] = 0
-        final_box[:, 2][final_box[:, 2] > x_max] = x_max
-        final_box[:, 3][final_box[:, 3] > y_max] = y_max
+        final_box = bbox_tools.clip_boxes(final_box, self.IMG_SHAPE)
 
-        self.cocotool.DrawBboxes(Original_Image=input1[0],Bboxes=base_boxes.tolist(), show=True)
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True)
         true_boxes = self.train_data_generator.gen_true_bbox_candidates(image_id=self.cocotool.image_ids[0])
-        self.cocotool.DrawBboxes(Original_Image=input1[0],Bboxes=true_boxes, show=True)
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=true_boxes, show=True)
         original_boxes = self.cocotool.GetOriginalBboxesList(image_id=self.cocotool.image_ids[0])
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=original_boxes, show=True)
-
-
 
     def train(self):
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data()
@@ -123,9 +113,7 @@ class FasterRCNN():
                                  epochs=24)
 
 
-
-
-if __name__=='__main__':
+if __name__ == '__main__':
     f1 = FasterRCNN()
     # data1 = coco_tools(
     #     file='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data/1940091026744/annotations/train.json',

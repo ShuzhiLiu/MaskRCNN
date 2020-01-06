@@ -66,7 +66,7 @@ class bbox_tools:
         box_after_reg[:, 3] = np.exp(regs[:, 3]) * base_box_xywh[:, 3]
 
         box_after_reg = cls.xywh2xxyy(box_after_reg)
-        return box_after_reg
+        return box_after_reg.astype(np.int)
 
     @classmethod
     def xxyy2xywh(cls, boxes):
@@ -93,6 +93,10 @@ class bbox_tools:
         x_max, y_max = IMG_SHAPE[0], IMG_SHAPE[1]
         boxes[:, 0][boxes[:, 0] < 0] = 0
         boxes[:, 1][boxes[:, 1] < 0] = 0
+        boxes[:, 2][boxes[:, 2] < 0] = 1
+        boxes[:, 3][boxes[:, 3] < 0] = 1
+        boxes[:, 0][boxes[:, 0] > x_max] = x_max-1
+        boxes[:, 1][boxes[:, 1] > y_max] = y_max-1
         boxes[:, 2][boxes[:, 2] > x_max] = x_max
         boxes[:, 3][boxes[:, 3] > y_max] = y_max
 

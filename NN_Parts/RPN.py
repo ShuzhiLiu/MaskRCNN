@@ -8,13 +8,15 @@ from Debugger import DebugPrint
 class RPN:
     def __init__(self, backbone_model):
         back_outshape = backbone_model.layers[-1].output.shape[1:]
-        self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same', kernel_initializer='he_normal', name='RPN_START')(
+        self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
+                                            kernel_initializer='he_normal', name='RPN_START')(
             backbone_model.layers[-1].output)
         self.bh1 = tf.keras.layers.BatchNormalization()(self.conv1)
         self.ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(self.bh1)
 
         # decide foreground or background
-        self.conv2 = tf.keras.layers.Conv2D(filters=18, kernel_size=(1, 1), padding='same', kernel_initializer='he_normal')(self.ac1)
+        self.conv2 = tf.keras.layers.Conv2D(filters=18, kernel_size=(1, 1), padding='same',
+                                            kernel_initializer='he_normal')(self.ac1)
         self.bh2 = tf.keras.layers.BatchNormalization()(self.conv2)
         self.ac2 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(self.bh2)
         self.reshape2 = tf.keras.layers.Reshape(
@@ -23,7 +25,8 @@ class RPN:
         # [1,0] is background, [0,1] is foreground. second channel is true.
 
         # bounding box regression
-        self.conv3 = tf.keras.layers.Conv2D(filters=36, kernel_size=(1, 1), padding='same', kernel_initializer='he_normal')(self.ac1)
+        self.conv3 = tf.keras.layers.Conv2D(filters=36, kernel_size=(1, 1), padding='same',
+                                            kernel_initializer='he_normal')(self.ac1)
         self.bh3 = tf.keras.layers.BatchNormalization()(self.conv3)
         self.ac3 = tf.keras.layers.Activation(activation=tf.keras.activations.linear)(self.bh3)
         self.RPN_BBOX_Regression_Pred = tf.keras.layers.Reshape(
@@ -43,7 +46,8 @@ class RPN:
 
     def _RPN_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
-        self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression, name='RPN_BBOX_Regression_Target')
+        self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression,
+                                                         name='RPN_BBOX_Regression_Target')
         self.RPN_train_model = tf.keras.Model(inputs=[self.RPN_model.layers[0].input,
                                                       self.RPN_Anchor_Target,
                                                       self.RPN_BBOX_Regression_Target],
@@ -59,35 +63,41 @@ class RPN:
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
 
     def _RPN_loss(self, anchor_target, bbox_reg_target, anchor_pred, bbox_reg_pred):
-        # batch size = 1
-        bbox_inside_weight = tf.ones(shape=(1,self.shape_Anchor_Target[0],self.shape_Anchor_Target[1],self.shape_Anchor_Target[2]), dtype=tf.float32) * -1
+        # shape of input anchor_target: (batch_size=1, h, w, n_anchors)
+        # currently only support batch size = 1
+        batch_size = 1
+        bbox_inside_weight = tf.zeros(
+            shape=(1, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]),
+            dtype=tf.float32)
 
+        # anchor_target: 1:foreground, 0.5:ignore, 0:background
         indices_foreground = tf.where(tf.equal(anchor_target, 1))
+        indices_background = tf.where(tf.equal(anchor_target, 0))
         # DebugPrint('indices_foreground', indices_foreground)
+        # DebugPrint('indices_background', indices_background)
         n_foreground = tf.gather_nd(tf.shape(indices_foreground), [[0]])
         # DebugPrint('n_foreground', n_foreground)
 
+        # update value of bbox_inside_weight corresponding to foreground to 1
         bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_foreground,
                                                          updates=tf.ones(shape=n_foreground))
 
-        indices_background = tf.where(tf.equal(anchor_target, 0.0))
-        # DebugPrint('indices_background', indices_background)
-        n_background = tf.gather_nd(tf.shape(indices_background), [[0]])
-
         # balance the foreground and background training sample
-        selected_ratio = (n_foreground + 64) / self.N_total_anchors
-        remain_ratio = (self.N_total_anchors - n_foreground - 64) / self.N_total_anchors
+        n_background_selected = 128
+        selected_ratio = (n_foreground + n_background_selected) / self.N_total_anchors
+        remain_ratio = (self.N_total_anchors - n_foreground - n_background_selected) / self.N_total_anchors
         concat = tf.concat([remain_ratio, selected_ratio], axis=0)
-        concat = tf.reshape(concat, (1,2))
+        concat = tf.reshape(concat, (1, 2))
         temp_random_choice = tf.random.categorical(tf.math.log(concat), self.N_total_anchors)
-        temp_random_choice = tf.reshape(temp_random_choice, (1,self.shape_Anchor_Target[0],self.shape_Anchor_Target[1],self.shape_Anchor_Target[2]))
+        temp_random_choice = tf.reshape(temp_random_choice, (
+        batch_size, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]))
         temp_random_choice = tf.gather_nd(params=temp_random_choice, indices=indices_background)
         temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
-
+        # update value of bbox_inside_weight corresponding to random selected background to 1
         bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_background,
                                                          updates=temp_random_choice)
 
-        indices_train = tf.where(tf.equal(bbox_inside_weight, 1.0))
+        indices_train = tf.where(tf.equal(bbox_inside_weight, 1))
 
         # print(anchor_target)
         # print(anchor_pred)
@@ -104,15 +114,8 @@ class RPN:
         bbox_reg_loss = Huberloss(y_true=bbox_reg_target, y_pred=bbox_reg_pred)
         bbox_reg_loss = tf.math.reduce_mean(bbox_reg_loss)
         total_loss = tf.add(anchor_loss, bbox_reg_loss)
-        # total_loss = tf.math.reduce_mean(total_loss)
 
         return total_loss
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
