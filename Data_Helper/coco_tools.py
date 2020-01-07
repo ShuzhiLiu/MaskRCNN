@@ -31,7 +31,7 @@ class coco_tools:
                 bboxes.append(anno['bbox'])
         bboxes_int = np.array(bboxes, dtype=np.int)
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
-        masks_pred, class_names = self.GetSegmMaskFromAnnoCOCO(annos, image_id)
+        masks_pred, class_ids = self.GetSegmMaskFromAnnoCOCO(annos, image_id)
         _, _, n_masks = masks_pred.shape
         for i in range(n_masks):
             color_random = np.random.randint(0, 256, (1, 3), dtype=np.uint8)
@@ -41,7 +41,7 @@ class coco_tools:
                           (bboxes_int[i, 0] + bboxes_int[i, 2], bboxes_int[i, 1] + bboxes_int[i, 3]),
                           color_random2[0],
                           2)
-            cv2.putText(tempimg, f'{i + 1}th Object_{class_names[i]}',
+            cv2.putText(tempimg, f'{i + 1}th Object_{class_ids[i]}',
                         (bboxes_int[i, 0] + bboxes_int[i, 2] + 10, bboxes_int[i, 1] + bboxes_int[i, 3]),
                         0, 0.3, color_random2[0])
             tempimg[:, :, 0][masks_pred[:, :, i]] = color_random[0, 0]

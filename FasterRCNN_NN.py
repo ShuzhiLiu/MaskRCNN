@@ -4,10 +4,11 @@ import numpy as np
 from NN_Helper import NN_data_generator, gen_candidate_anchors, bbox_tools
 import tensorflow as tf
 from Debugger import DebugPrint
+from FasterRCNN_config import Param
 
 
 class FasterRCNN():
-    def __init__(self, IMG_SHAPE=(720, 1280, 3)):
+    def __init__(self, IMG_SHAPE=Param.IMG_SHAPE):
         b1 = Backbone(IMG_SHAPE=IMG_SHAPE)
         self.IMG_SHAPE = IMG_SHAPE
         self.backbone_model = b1.backbone_model
@@ -15,17 +16,11 @@ class FasterRCNN():
         self.RPN_model = self.RPN.RPN_model
         self.RPN_train_model = self.RPN.RPN_train_model
 
-        # BASE_PATH = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
-        # imagefolder_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
-        BASE_PATH = '/home/liushuzhi/Documents/mmdetection_tools/data'
-        imagefolder_path = '/home/liushuzhi/Documents/mmdetection_tools/LocalData_Images'
-        DATASET_ID = '1940091026744'
-        image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
-        self.train_data_generator = NN_data_generator(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
-                                                      imagefolder_path=imagefolder_path)
+        self.train_data_generator = NN_data_generator(file=f"{Param.PATH_DATA}/{Param.DATASET_ID}/annotations/train.json",
+                                                      imagefolder_path=Param.PATH_IMAGES)
         self.cocotool = self.train_data_generator.dataset_coco
 
-        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]))
+        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]),n_stage=5)
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
 
     def test_loss_function(self):
@@ -100,17 +95,26 @@ class FasterRCNN():
         # clip the boxes to make sure they are legal boxes
         final_box = bbox_tools.clip_boxes(final_box, self.IMG_SHAPE)
 
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True)
-        true_boxes = self.train_data_generator.gen_true_bbox_candidates(image_id=self.cocotool.image_ids[0])
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=true_boxes, show=True)
         original_boxes = self.cocotool.GetOriginalBboxesList(image_id=self.cocotool.image_ids[0])
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=original_boxes, show=True)
+        true_boxes = self.train_data_generator.gen_true_bbox_candidates(image_id=self.cocotool.image_ids[0])
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=true_boxes, show=True)
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=base_boxes.tolist(), show=True)
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True)
+
+
 
     def train(self):
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data()
         self.RPN_train_model.fit([inputs, anchor_targets, bbox_reg_targets],
                                  batch_size=1,
                                  epochs=24)
+
+    def save_weight(self):
+        self.RPN_model.save_weights(filepath=f"{Param.PATH_MODEL}/RPN_model")
+
+    def load_weight(self):
+        self.RPN_model.load_weights(filepath=f"{Param.PATH_MODEL}/RPN_model")
 
 
 if __name__ == '__main__':
@@ -121,6 +125,8 @@ if __name__ == '__main__':
     # img1 = data1.GetOriginalImage(image_id='20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4')
     # t1, t2 = f1.RPN_model.predict(np.array([img1]))
     # print(t1, t2)
-    f1.test_proposal_visualization()
-    f1.train()
+    # f1.test_proposal_visualization()
+    # f1.train()
+    # f1.save_weight()
+    f1.load_weight()
     f1.test_proposal_visualization()

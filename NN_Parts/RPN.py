@@ -6,7 +6,10 @@ from Debugger import DebugPrint
 
 
 class RPN:
-    def __init__(self, backbone_model):
+    def __init__(self, backbone_model, lambda_factor=1, batch=1):
+        self.LAMBDA_FACTOR = lambda_factor
+        self.BATCH = 1
+        # the part of backbone
         back_outshape = backbone_model.layers[-1].output.shape[1:]
         self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
                                             kernel_initializer='he_normal', name='RPN_START')(
@@ -65,12 +68,11 @@ class RPN:
     def _RPN_loss(self, anchor_target, bbox_reg_target, anchor_pred, bbox_reg_pred):
         # shape of input anchor_target: (batch_size=1, h, w, n_anchors)
         # currently only support batch size = 1
-        batch_size = 1
         bbox_inside_weight = tf.zeros(
-            shape=(1, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]),
+            shape=(self.BATCH, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]),
             dtype=tf.float32)
 
-        # anchor_target: 1:foreground, 0.5:ignore, 0:background
+        # --- anchor_target: 1:foreground, 0.5:ignore, 0:background ---
         indices_foreground = tf.where(tf.equal(anchor_target, 1))
         indices_background = tf.where(tf.equal(anchor_target, 0))
         # DebugPrint('indices_foreground', indices_foreground)
@@ -78,11 +80,11 @@ class RPN:
         n_foreground = tf.gather_nd(tf.shape(indices_foreground), [[0]])
         # DebugPrint('n_foreground', n_foreground)
 
-        # update value of bbox_inside_weight corresponding to foreground to 1
+        # --- update value of bbox_inside_weight corresponding to foreground to 1 ---
         bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_foreground,
                                                          updates=tf.ones(shape=n_foreground))
 
-        # balance the foreground and background training sample
+        # --- balance the foreground and background training sample ---
         n_background_selected = 128
         selected_ratio = (n_foreground + n_background_selected) / self.N_total_anchors
         remain_ratio = (self.N_total_anchors - n_foreground - n_background_selected) / self.N_total_anchors
@@ -90,10 +92,10 @@ class RPN:
         concat = tf.reshape(concat, (1, 2))
         temp_random_choice = tf.random.categorical(tf.math.log(concat), self.N_total_anchors)
         temp_random_choice = tf.reshape(temp_random_choice, (
-        batch_size, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]))
+        self.BATCH, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]))
         temp_random_choice = tf.gather_nd(params=temp_random_choice, indices=indices_background)
         temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
-        # update value of bbox_inside_weight corresponding to random selected background to 1
+        # --- update value of bbox_inside_weight corresponding to random selected background to 1 ---
         bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_background,
                                                          updates=temp_random_choice)
 
@@ -104,7 +106,7 @@ class RPN:
         # train anchor for foreground and background
         anchor_target = tf.gather_nd(params=anchor_target, indices=indices_train)
         anchor_pred = tf.gather_nd(params=anchor_pred, indices=indices_train)
-        # train bbox reg only for foreground
+        # --- train bbox reg only for foreground ---
         bbox_reg_target = tf.gather_nd(params=bbox_reg_target, indices=indices_foreground)
         bbox_reg_pred = tf.gather_nd(params=bbox_reg_pred, indices=indices_foreground)
 
@@ -113,6 +115,7 @@ class RPN:
         Huberloss = tf.losses.Huber()
         bbox_reg_loss = Huberloss(y_true=bbox_reg_target, y_pred=bbox_reg_pred)
         bbox_reg_loss = tf.math.reduce_mean(bbox_reg_loss)
+        bbox_reg_loss = tf.math.multiply(bbox_reg_loss, self.LAMBDA_FACTOR)
         total_loss = tf.add(anchor_loss, bbox_reg_loss)
 
         return total_loss
