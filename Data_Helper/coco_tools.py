@@ -3,9 +3,13 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import os
+from pycococreatortools import pycococreatortools
+from copy import deepcopy
+
 class coco_tools:
     def __init__(self, file, imagefolder_path):
         self.imagefolder_path = imagefolder_path
+        self.file = file
         with open(file, 'r') as f:
             dict1 = json.load(f)
         self.info = dict1["info"]
@@ -18,8 +22,6 @@ class coco_tools:
         for image in self.images:
             if image['id'] not in self.image_ids:
                 self.image_ids.append(image['id'])
-
-
 
     def DrawSegmFromAnnoCoco(self, image_id, Original_Image, annos, show=False, savefile=False):
         height, width = 0, 0
@@ -108,12 +110,11 @@ class coco_tools:
             if image['id'] not in self.image_ids:
                 self.image_ids.append(image['id'])
 
-    def GetOriginalImage(self,image_id):
+    def GetOriginalImage(self, image_id):
         image_name = self.GetImageName(image_id)
         img = cv2.imread(f"{self.imagefolder_path}/{image_name}")
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         return np.array(img_rgb)
-
 
     def GetOriginalBboxesList(self, image_id):
         # read original opencv bbox and convert to numpy format bbox
@@ -121,7 +122,7 @@ class coco_tools:
         for anno in self.annotations:
             if anno['image_id'] == image_id:
                 bbox = np.array(anno['bbox'], dtype=np.int)
-                bbox[0], bbox[1],bbox[2],bbox[3] = bbox[1],bbox[0], bbox[1] + bbox[3], bbox[0]+bbox[2]
+                bbox[0], bbox[1], bbox[2], bbox[3] = bbox[1], bbox[0], bbox[1] + bbox[3], bbox[0] + bbox[2]
                 Bboxes.append(bbox)
         return Bboxes
 
@@ -136,15 +137,11 @@ class coco_tools:
         Masks = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
-                img_temp = np.zeros(shape=(height,width), dtype=np.uint8)
-                contour = np.reshape(anno['segmentation'], newshape=(-1,2)).astype(int)
+                img_temp = np.zeros(shape=(height, width), dtype=np.uint8)
+                contour = np.reshape(anno['segmentation'], newshape=(-1, 2)).astype(int)
                 img_temp = cv2.fillPoly(img_temp, [contour], 1)
                 Masks.append(img_temp)
         return Masks
-
-
-
-
 
     def GetImageName(self, image_id):
         for image in self.images:
@@ -154,3 +151,110 @@ class coco_tools:
     def DrawWithImageID(self, image_id):
         original_image = self.GetOriginalImage(image_id)
         self.DrawSegmFromAnnoCoco(image_id, original_image, self.annotations, True)
+
+    def AgumentationOneImage(self, image_id):
+        annotation_ids = []
+        for anno in self.annotations:
+            annotation_ids.append(int(anno['id']))
+
+        max_annotation_id = max(annotation_ids)
+        counter = 1
+        masks, class_ids = self.GetSegmMaskFromAnnoCOCO(self.annotations, image_id)
+        masks = masks.astype(np.uint8)
+        img = self.GetOriginalImage(image_id)
+        _, _, n_masks = masks.shape
+        image_dict = {}
+        for img_dic in self.images:
+            if img_dic['id'] == image_id:
+                image_dict = deepcopy(img_dic)
+                break
+        # === flip vertically ===
+        img_flipped_vertical = np.flip(img, axis=0)
+        open_cv_image = cv2.cvtColor(img_flipped_vertical, cv2.COLOR_RGB2BGR)
+        image_id_new = f"{image_id}Vertical"
+        cv2.imwrite(filename=f"{self.imagefolder_path}/{image_id_new}.png", img=open_cv_image)
+        image_dict['id'] = f"{image_id_new}"
+        image_dict['file_name'] = f"{image_id_new}.png"
+        print(f"image_dic: {image_dict}")
+        self.images.append(deepcopy(image_dict))
+        for index in range(n_masks):
+            mask = masks[:, :, index]
+            mask = np.flip(mask, axis=0)
+            category_info = {"id": class_ids[index], "is_crowd": False}
+            anno = pycococreatortools.create_annotation_info(annotation_id=max_annotation_id + counter,
+                                                             image_id=f"{image_id_new}",
+                                                             category_info=category_info,
+                                                             binary_mask=mask.astype(np.uint8),
+                                                             image_size=None,
+                                                             tolerance=2,
+                                                             bounding_box=None)
+            counter += 1
+            print(anno)
+            self.annotations.append(anno)
+        # === flip horizontally ===
+        image_id_new = f"{image_id}Horizontal"
+        image_dict['id'] = f"{image_id_new}"
+        image_dict['file_name'] = f"{image_id_new}.png"
+        print(f"image_dic: {image_dict}")
+        self.images.append(deepcopy(image_dict))
+        img_flipped_horizontal = np.flip(img, axis=1)
+        open_cv_image = cv2.cvtColor(img_flipped_horizontal, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(filename=f"{self.imagefolder_path}/{image_id_new}.png", img=open_cv_image)
+        for index in range(n_masks):
+            mask = masks[:, :, index]
+            mask = np.flip(mask, axis=1)
+            category_info = {"id": class_ids[index], "is_crowd": False}
+            anno = pycococreatortools.create_annotation_info(annotation_id=max_annotation_id + counter,
+                                                             image_id=f"{image_id_new}",
+                                                             category_info=category_info,
+                                                             binary_mask=mask.astype(np.uint8),
+                                                             image_size=None,
+                                                             tolerance=2,
+                                                             bounding_box=None)
+            counter += 1
+            print(anno)
+            self.annotations.append(anno)
+        # === flip both directions ===
+        image_id_new = f"{image_id}Both"
+        image_dict['id'] = f"{image_id_new}"
+        image_dict['file_name'] = f"{image_id_new}.png"
+        print(f"image_dic: {image_dict}")
+        self.images.append(deepcopy(image_dict))
+        img_flipped_both = np.flip(img, axis=(0, 1))
+        open_cv_image = cv2.cvtColor(img_flipped_both, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(filename=f"{self.imagefolder_path}/{image_id_new}.png", img=open_cv_image)
+        for index in range(n_masks):
+            mask = masks[:, :, index]
+            mask = np.flip(mask, axis=(0, 1))
+            category_info = {"id": class_ids[index], "is_crowd": False}
+            anno = pycococreatortools.create_annotation_info(annotation_id=max_annotation_id + counter,
+                                                             image_id=f"{image_id_new}",
+                                                             category_info=category_info,
+                                                             binary_mask=mask.astype(np.uint8),
+                                                             image_size=None,
+                                                             tolerance=2,
+                                                             bounding_box=None)
+            counter += 1
+            print(anno)
+            self.annotations.append(anno)
+
+    def Augmentation(self):
+        if 'augmented' in self.info:
+            print('already augmented')
+            pass
+        else:
+            print('start augmenting')
+            for image_id in self.image_ids:
+                self.AgumentationOneImage(image_id)
+            self.info['augmented'] = 'yes'
+            with open(self.file, 'w') as f:
+                json.dump({
+                    "info": self.info,
+                    "licenses": self.licenses,
+                    "images": self.images,
+                    "annotations": self.annotations,
+                    "categories": self.categories,
+                    "segment_info": self.segment_info
+                },
+                    f,
+                    indent=4)
