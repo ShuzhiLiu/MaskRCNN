@@ -12,7 +12,7 @@ class FasterRCNN():
         b1 = Backbone(IMG_SHAPE=IMG_SHAPE)
         self.IMG_SHAPE = IMG_SHAPE
         self.backbone_model = b1.backbone_model
-        self.RPN = RPN(self.backbone_model)
+        self.RPN = RPN(self.backbone_model, Param.LAMBDA_FACTOR, Param.BATCH)
         self.RPN_model = self.RPN.RPN_model
         self.RPN_train_model = self.RPN.RPN_train_model
 

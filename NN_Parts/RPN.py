@@ -8,7 +8,7 @@ from Debugger import DebugPrint
 class RPN:
     def __init__(self, backbone_model, lambda_factor=1, batch=1):
         self.LAMBDA_FACTOR = lambda_factor
-        self.BATCH = 1
+        self.BATCH = batch
         # the part of backbone
         back_outshape = backbone_model.layers[-1].output.shape[1:]
         self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',

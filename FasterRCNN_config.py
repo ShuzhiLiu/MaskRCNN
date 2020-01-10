@@ -5,7 +5,7 @@ class Param:
     # === could change now ===
     PATH_MODEL = 'SavedModels'
     LR = 0.001
-    LAMBDA_FACTOR = 1
+    LAMBDA_FACTOR = 5
     EPOCH = 24
     IMG_SHAPE = (720,1280,3)
     # PATH_DATA = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
