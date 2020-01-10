@@ -104,13 +104,15 @@ class RPN:
         # print(anchor_target)
         # print(anchor_pred)
         # train anchor for foreground and background
+        anchor_target = tf.cast(anchor_target, tf.int32)
+        anchor_target = tf.one_hot(indices=anchor_target, depth=2, axis=-1)
         anchor_target = tf.gather_nd(params=anchor_target, indices=indices_train)
         anchor_pred = tf.gather_nd(params=anchor_pred, indices=indices_train)
         # --- train bbox reg only for foreground ---
         bbox_reg_target = tf.gather_nd(params=bbox_reg_target, indices=indices_foreground)
         bbox_reg_pred = tf.gather_nd(params=bbox_reg_pred, indices=indices_foreground)
 
-        anchor_loss = tf.losses.sparse_categorical_crossentropy(y_true=anchor_target, y_pred=anchor_pred)
+        anchor_loss = tf.losses.categorical_crossentropy(y_true=anchor_target, y_pred=anchor_pred)
         anchor_loss = tf.math.reduce_mean(anchor_loss)
         Huberloss = tf.losses.Huber()
         bbox_reg_loss = Huberloss(y_true=bbox_reg_target, y_pred=bbox_reg_pred)
