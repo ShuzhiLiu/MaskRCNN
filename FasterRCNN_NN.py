@@ -16,11 +16,12 @@ class FasterRCNN():
         self.RPN_model = self.RPN.RPN_model
         self.RPN_train_model = self.RPN.RPN_train_model
 
-        self.train_data_generator = NN_data_generator(file=f"{Param.PATH_DATA}/{Param.DATASET_ID}/annotations/train.json",
-                                                      imagefolder_path=Param.PATH_IMAGES)
+        self.train_data_generator = NN_data_generator(
+            file=f"{Param.PATH_DATA}/{Param.DATASET_ID}/annotations/train.json",
+            imagefolder_path=Param.PATH_IMAGES)
         self.cocotool = self.train_data_generator.dataset_coco
 
-        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]),n_stage=5)
+        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]), n_stage=5)
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
 
     def test_loss_function(self):
@@ -65,17 +66,11 @@ class FasterRCNN():
         top_indices = tf.reshape(top_indices, (-1, 1))
         DebugPrint('top indices', top_indices)
 
-        # flatten the bbox_reg by last dim to use top_indices to get final_box_reg
-        RPN_BBOX_Regression_Pred_shape = tf.shape(RPN_BBOX_Regression_Pred)
-        RPN_BBOX_Regression_Pred = tf.reshape(RPN_BBOX_Regression_Pred, (-1, RPN_BBOX_Regression_Pred_shape[-1]))
-        DebugPrint('RPN_BBOX_Regression_Pred shape', RPN_BBOX_Regression_Pred.shape)
-        final_box_reg = tf.gather_nd(RPN_BBOX_Regression_Pred, top_indices)
-        DebugPrint('final box reg values', final_box_reg)
 
-        # Convert to numpy to plot
-        final_box_reg = np.array(final_box_reg)
-        DebugPrint('final box reg shape', final_box_reg.shape)
+        # === Non maximum suppresion ===
 
+
+        # --- find the base boxes ---
         update_value = [2] * n_anchor_proposal
         RPN_Anchor_Pred = tf.tensor_scatter_nd_update(RPN_Anchor_Pred, top_indices, update_value)
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, shape1)
@@ -87,6 +82,17 @@ class FasterRCNN():
         DebugPrint('base_boxes', base_boxes)
         base_boxes = np.array(base_boxes)
 
+        # --- find the bbox_regs ---
+        # flatten the bbox_reg by last dim to use top_indices to get final_box_reg
+        RPN_BBOX_Regression_Pred_shape = tf.shape(RPN_BBOX_Regression_Pred)
+        RPN_BBOX_Regression_Pred = tf.reshape(RPN_BBOX_Regression_Pred, (-1, RPN_BBOX_Regression_Pred_shape[-1]))
+        DebugPrint('RPN_BBOX_Regression_Pred shape', RPN_BBOX_Regression_Pred.shape)
+        final_box_reg = tf.gather_nd(RPN_BBOX_Regression_Pred, top_indices)
+        DebugPrint('final box reg values', final_box_reg)
+
+        # Convert to numpy to plot
+        final_box_reg = np.array(final_box_reg)
+        DebugPrint('final box reg shape', final_box_reg.shape)
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
 
         # Need to convert above instructions to tf operations
@@ -101,8 +107,6 @@ class FasterRCNN():
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=true_boxes, show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=base_boxes.tolist(), show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True)
-
-
 
     def train(self):
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data()
@@ -125,8 +129,8 @@ if __name__ == '__main__':
     # img1 = data1.GetOriginalImage(image_id='20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4')
     # t1, t2 = f1.RPN_model.predict(np.array([img1]))
     # print(t1, t2)
-    f1.test_proposal_visualization()
-    f1.train()
-    f1.save_weight()
+    # f1.test_proposal_visualization()
+    # f1.train()
+    # f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
