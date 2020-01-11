@@ -56,8 +56,11 @@ class FasterRCNN():
         print(RPN_Anchor_Pred.shape, RPN_BBOX_Regression_Pred.shape)
         # flatten the pred of anchor to get top N values and indices
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, (-1,))
-        n_anchor_proposal = 30
-        top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred, n_anchor_proposal)
+        n_anchor_proposal = 300
+        top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred, n_anchor_proposal) # top_k has sort function. it's important here
+        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, 0.9)))
+        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, 0.9)))
+
         DebugPrint('top values', top_values)
 
         # test_indices = tf.where(tf.greater(tf.reshape(RPN_Anchor_Pred, (-1,)), 0.9))
@@ -65,16 +68,17 @@ class FasterRCNN():
 
         top_indices = tf.reshape(top_indices, (-1, 1))
         DebugPrint('top indices', top_indices)
+        update_value = tf.math.add(top_values, 1)
+        RPN_Anchor_Pred = tf.tensor_scatter_nd_update(RPN_Anchor_Pred, top_indices, update_value)
+        RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, shape1)
 
 
-        # === Non maximum suppresion ===
+
+
 
 
         # --- find the base boxes ---
-        update_value = [2] * n_anchor_proposal
-        RPN_Anchor_Pred = tf.tensor_scatter_nd_update(RPN_Anchor_Pred, top_indices, update_value)
-        RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, shape1)
-        Anchor_Pred_top_indices = tf.where(tf.equal(RPN_Anchor_Pred, 2))
+        Anchor_Pred_top_indices = tf.where(tf.greater(RPN_Anchor_Pred, 1))
         DebugPrint('original_indices shape', Anchor_Pred_top_indices.shape)
         DebugPrint('original_indices', Anchor_Pred_top_indices)
         base_boxes = tf.gather_nd(self.anchor_candidates, Anchor_Pred_top_indices)
@@ -95,7 +99,18 @@ class FasterRCNN():
         DebugPrint('final box reg shape', final_box_reg.shape)
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
 
+        # === Non maximum suppression ===
+        final_box_temp = np.array(final_box)
+        nms_boxes_list = []
+        while final_box_temp.shape[0] >0:
+            ious = self.nms_loop_np(final_box_temp)
+            nms_boxes_list.append(final_box_temp[0,:])  # since it's sorted by the value, here we can pick the first one each time.
+            final_box_temp = final_box_temp[ious<0.5]
+        print(len(nms_boxes_list))
+
+
         # Need to convert above instructions to tf operations
+
 
         # === visualization part ===
         # clip the boxes to make sure they are legal boxes
@@ -107,6 +122,39 @@ class FasterRCNN():
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=true_boxes, show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=base_boxes.tolist(), show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True)
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=nms_boxes_list, show=True)
+
+    def nms_loop_np(self, boxes):
+        # boxes : (N, 4), box_1target : (4,)
+        # box axis format: (x1,y1,x2,y2)
+        # boxes = boxes.astype(np.float)
+        box_1target = np.ones(shape=boxes.shape)
+        zeros = np.zeros(shape=boxes.shape)
+        box_1target = box_1target * boxes[0, :]
+        boxBArea = (box_1target[:,2] - box_1target[:,0] + 1) * (box_1target[:,3] - box_1target[:,1] + 1)
+        # determine the (x, y)-coordinates of the intersection rectangle
+        xA = np.max(np.array([boxes[:, 0], box_1target[:,0]]), axis=0)
+        yA = np.max(np.array([boxes[:, 1], box_1target[:,1]]), axis=0)
+        xB = np.min(np.array([boxes[:, 2], box_1target[:,2]]), axis=0)
+        yB = np.min(np.array([boxes[:, 3], box_1target[:,3]]), axis=0)
+
+        # compute the area of intersection rectangle
+        interArea = np.max(np.array([zeros[:,0], xB - xA + 1]), axis=0) * np.max(np.array([zeros[:,0], yB - yA + 1]), axis=0)
+
+        # compute the area of both the prediction and ground-truth
+        # rectangles
+        boxAArea = (boxes[:, 2] - boxes[:, 0] + 1) * (boxes[:, 3] - boxes[:, 1] + 1)
+
+        # compute the intersection over union by taking the intersection
+        # area and dividing it by the sum of prediction + ground-truth
+        # areas - the interesection area
+        ious = (interArea / (boxAArea + boxBArea - interArea))
+
+        # return the intersection over union value
+        return ious
+
+    def nms_loop_tf(self, score_values, boxes, nms_boxes):
+        ious = tf.numpy_function(func=self.nms_loop_np, inp=[boxes], Tout=tf.float32)
 
     def train(self):
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data()
