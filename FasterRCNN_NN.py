@@ -57,9 +57,10 @@ class FasterRCNN():
         # flatten the pred of anchor to get top N values and indices
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, (-1,))
         n_anchor_proposal = 300
-        top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred, n_anchor_proposal) # top_k has sort function. it's important here
-        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, 0.9)))
-        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, 0.9)))
+        top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred,
+                                                n_anchor_proposal)  # top_k has sort function. it's important here
+        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, 0.8)))
+        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, 0.8)))
 
         DebugPrint('top values', top_values)
 
@@ -71,11 +72,6 @@ class FasterRCNN():
         update_value = tf.math.add(top_values, 1)
         RPN_Anchor_Pred = tf.tensor_scatter_nd_update(RPN_Anchor_Pred, top_indices, update_value)
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, shape1)
-
-
-
-
-
 
         # --- find the base boxes ---
         Anchor_Pred_top_indices = tf.where(tf.greater(RPN_Anchor_Pred, 1))
@@ -100,17 +96,16 @@ class FasterRCNN():
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
 
         # === Non maximum suppression ===
-        final_box_temp = np.array(final_box)
+        final_box_temp = np.array(final_box).astype(np.int)
         nms_boxes_list = []
-        while final_box_temp.shape[0] >0:
+        while final_box_temp.shape[0] > 0:
             ious = self.nms_loop_np(final_box_temp)
-            nms_boxes_list.append(final_box_temp[0,:])  # since it's sorted by the value, here we can pick the first one each time.
-            final_box_temp = final_box_temp[ious<0.5]
+            nms_boxes_list.append(
+                final_box_temp[0, :])  # since it's sorted by the value, here we can pick the first one each time.
+            final_box_temp = final_box_temp[ious < 0.5]
         print(len(nms_boxes_list))
 
-
         # Need to convert above instructions to tf operations
-
 
         # === visualization part ===
         # clip the boxes to make sure they are legal boxes
@@ -131,15 +126,16 @@ class FasterRCNN():
         box_1target = np.ones(shape=boxes.shape)
         zeros = np.zeros(shape=boxes.shape)
         box_1target = box_1target * boxes[0, :]
-        boxBArea = (box_1target[:,2] - box_1target[:,0] + 1) * (box_1target[:,3] - box_1target[:,1] + 1)
+        boxBArea = (box_1target[:, 2] - box_1target[:, 0] + 1) * (box_1target[:, 3] - box_1target[:, 1] + 1)
         # determine the (x, y)-coordinates of the intersection rectangle
-        xA = np.max(np.array([boxes[:, 0], box_1target[:,0]]), axis=0)
-        yA = np.max(np.array([boxes[:, 1], box_1target[:,1]]), axis=0)
-        xB = np.min(np.array([boxes[:, 2], box_1target[:,2]]), axis=0)
-        yB = np.min(np.array([boxes[:, 3], box_1target[:,3]]), axis=0)
+        xA = np.max(np.array([boxes[:, 0], box_1target[:, 0]]), axis=0)
+        yA = np.max(np.array([boxes[:, 1], box_1target[:, 1]]), axis=0)
+        xB = np.min(np.array([boxes[:, 2], box_1target[:, 2]]), axis=0)
+        yB = np.min(np.array([boxes[:, 3], box_1target[:, 3]]), axis=0)
 
         # compute the area of intersection rectangle
-        interArea = np.max(np.array([zeros[:,0], xB - xA + 1]), axis=0) * np.max(np.array([zeros[:,0], yB - yA + 1]), axis=0)
+        interArea = np.max(np.array([zeros[:, 0], xB - xA + 1]), axis=0) * np.max(np.array([zeros[:, 0], yB - yA + 1]),
+                                                                                  axis=0)
 
         # compute the area of both the prediction and ground-truth
         # rectangles
@@ -153,7 +149,7 @@ class FasterRCNN():
         # return the intersection over union value
         return ious
 
-    def nms_loop_tf(self, score_values, boxes, nms_boxes):
+    def nms_loop_tf(self,boxes):
         ious = tf.numpy_function(func=self.nms_loop_np, inp=[boxes], Tout=tf.float32)
 
     def train(self):

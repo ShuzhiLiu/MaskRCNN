@@ -3,8 +3,13 @@ import numpy as np
 import tensorflow as tf
 
 class RoI:
-    def __init__(self):
-        pass
+    def __init__(self, IMG_SHAPE):
+        image_input = tf.keras.Input(shape=IMG_SHAPE, name='IMAGE_INPUT')
+        proposal_boxes = tf.keras.Input(shape=(4,),batch_size = None,name='PROPOSAL_BOXES')
+        shape1 = tf.shape(proposal_boxes)
+        n_boxes = tf.gather_nd(shape1, [0])
+        indices = tf.ones(shape=n_boxes)
+        image_crop = tf.image.crop_and_resize(image_input, proposal_boxes,indices, [7,7])
 
     def proposal(self,anchor_candidates):
         # === Prediction part ===
@@ -57,4 +62,8 @@ class RoI:
         base_boxes = np.array(base_boxes)
 
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
+
+
+if __name__=='__main__':
+    t1 = RoI(IMG_SHAPE=(720,1280,3))
 

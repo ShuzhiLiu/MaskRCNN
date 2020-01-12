@@ -10,16 +10,20 @@ class RPN:
         self.LAMBDA_FACTOR = lambda_factor
         self.BATCH = batch
         # the part of backbone
-        back_outshape = backbone_model.layers[-1].output.shape[1:]
-        self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
-                                            kernel_initializer='he_normal', name='RPN_START')(
-            backbone_model.layers[-1].output)
-        self.bh1 = tf.keras.layers.BatchNormalization()(self.conv1)
-        self.ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(self.bh1)
+        back_outshape = backbone_model.output.shape[1:]
+
+        # reorganize base model
+        self.base_model2 = tf.keras.Sequential(layers=[
+            backbone_model,
+            tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
+                                   kernel_initializer='he_normal', name='RPN_START'),
+            tf.keras.layers.BatchNormalization(),
+            tf.keras.layers.Activation(activation=tf.keras.activations.relu)
+        ])
 
         # decide foreground or background
         self.conv2 = tf.keras.layers.Conv2D(filters=18, kernel_size=(1, 1), padding='same',
-                                            kernel_initializer='he_normal')(self.ac1)
+                                            kernel_initializer='he_normal')(self.base_model2.output)
         self.bh2 = tf.keras.layers.BatchNormalization()(self.conv2)
         self.ac2 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(self.bh2)
         self.reshape2 = tf.keras.layers.Reshape(
@@ -29,14 +33,14 @@ class RPN:
 
         # bounding box regression
         self.conv3 = tf.keras.layers.Conv2D(filters=36, kernel_size=(1, 1), padding='same',
-                                            kernel_initializer='he_normal')(self.ac1)
+                                            kernel_initializer='he_normal')(self.base_model2.output)
         self.bh3 = tf.keras.layers.BatchNormalization()(self.conv3)
         self.ac3 = tf.keras.layers.Activation(activation=tf.keras.activations.linear)(self.bh3)
         self.RPN_BBOX_Regression_Pred = tf.keras.layers.Reshape(
             target_shape=(back_outshape[0], back_outshape[1], int(36 / 4), 4), name='RPN_BBOX_Regression_Pred')(
             self.ac3)
 
-        self.RPN_model = tf.keras.Model(inputs=[backbone_model.layers[0].input],
+        self.RPN_model = tf.keras.Model(inputs=[self.base_model2.input],
                                         outputs=[self.RPN_Anchor_Pred, self.RPN_BBOX_Regression_Pred], name='RPN_model')
 
         self.shape_Anchor_Target = self.RPN_model.get_layer(name='tf_op_layer_RPN_Anchor_Pred').output.shape[1:-1]
@@ -51,7 +55,7 @@ class RPN:
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
         self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression,
                                                          name='RPN_BBOX_Regression_Target')
-        self.RPN_train_model = tf.keras.Model(inputs=[self.RPN_model.layers[0].input,
+        self.RPN_train_model = tf.keras.Model(inputs=[self.RPN_model.input,
                                                       self.RPN_Anchor_Target,
                                                       self.RPN_BBOX_Regression_Target],
                                               outputs=[self.RPN_Anchor_Pred,
@@ -92,7 +96,7 @@ class RPN:
         concat = tf.reshape(concat, (1, 2))
         temp_random_choice = tf.random.categorical(tf.math.log(concat), self.N_total_anchors)
         temp_random_choice = tf.reshape(temp_random_choice, (
-        self.BATCH, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]))
+            self.BATCH, self.shape_Anchor_Target[0], self.shape_Anchor_Target[1], self.shape_Anchor_Target[2]))
         temp_random_choice = tf.gather_nd(params=temp_random_choice, indices=indices_background)
         temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
         # --- update value of bbox_inside_weight corresponding to random selected background to 1 ---
