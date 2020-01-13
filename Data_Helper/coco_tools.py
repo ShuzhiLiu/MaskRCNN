@@ -6,6 +6,7 @@ import os
 from pycococreatortools import pycococreatortools
 from copy import deepcopy
 
+
 class coco_tools:
     def __init__(self, file, imagefolder_path):
         self.imagefolder_path = imagefolder_path
@@ -24,12 +25,10 @@ class coco_tools:
                 self.image_ids.append(image['id'])
 
     def DrawSegmFromAnnoCoco(self, image_id, Original_Image, annos, show=False, savefile=False):
-        height, width = 0, 0
+        height, width = self.GetImageShape(image_id)
         bboxes = []
         for anno in annos:
             if anno['image_id'] == image_id:
-                height = anno['height']
-                width = anno['width']
                 bboxes.append(anno['bbox'])
         bboxes_int = np.array(bboxes, dtype=np.int)
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
@@ -77,14 +76,11 @@ class coco_tools:
 
     def GetSegmMaskFromAnnoCOCO(self, annos, image_id):
         segms = []
-        height = None
-        width = None
+        height, width = self.GetImageShape(image_id)
         class_ids = []
         for anno in annos:
             if anno['image_id'] == image_id:
                 segms.append(np.reshape(anno['segmentation'][0], newshape=(-1, 2)))
-                height = anno['height']
-                width = anno['width']
                 class_ids.append(anno['category_id'])
         n_segms = len(segms)
         mask_temp = np.zeros(shape=(height, width, n_segms), dtype=np.uint8)
@@ -128,12 +124,7 @@ class coco_tools:
 
     def GetOriginalSegmsMaskList(self, image_id):
         # TODO: put mask list to dictionary of labels
-        width, height = 0, 0
-        for image in self.images:
-            if image['id'] == image_id:
-                width = image['width']
-                height = image['height']
-                break
+        height, width = self.GetImageShape(image_id)
         Masks = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
@@ -147,6 +138,11 @@ class coco_tools:
         for image in self.images:
             if image['id'] == image_id:
                 return image['file_name']
+
+    def GetImageShape(self, image_id):
+        for image in self.images:
+            if image['id'] == image_id:
+                return (image['height'], image['width'])
 
     def DrawWithImageID(self, image_id):
         original_image = self.GetOriginalImage(image_id)
@@ -258,3 +254,10 @@ class coco_tools:
                 },
                     f,
                     indent=4)
+
+
+if __name__ == '__main__':
+    file = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data/1940091026744/annotations/train.json'
+    image_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
+    t1 = coco_tools(file, image_path)
+    t1.DrawWithImageID(t1.image_ids[0])
