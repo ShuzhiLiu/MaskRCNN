@@ -20,6 +20,7 @@ class RPN:
             tf.keras.layers.BatchNormalization(),
             tf.keras.layers.Activation(activation=tf.keras.activations.relu)
         ])
+        # self.base_model2 = backbone_model
 
         # decide foreground or background
         self.conv2 = tf.keras.layers.Conv2D(filters=18, kernel_size=(1, 1), padding='same',

@@ -21,7 +21,7 @@ class FasterRCNN():
             imagefolder_path=Param.PATH_IMAGES)
         self.cocotool = self.train_data_generator.dataset_coco
 
-        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]), n_stage=5)
+        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]), n_stage=Param.N_STAGE)
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
 
     def test_loss_function(self):
@@ -56,11 +56,11 @@ class FasterRCNN():
         print(RPN_Anchor_Pred.shape, RPN_BBOX_Regression_Pred.shape)
         # flatten the pred of anchor to get top N values and indices
         RPN_Anchor_Pred = tf.reshape(RPN_Anchor_Pred, (-1,))
-        n_anchor_proposal = 300
+        n_anchor_proposal = Param.ANCHOR_PROPOSAL_N
         top_values, top_indices = tf.math.top_k(RPN_Anchor_Pred,
                                                 n_anchor_proposal)  # top_k has sort function. it's important here
-        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, 0.8)))
-        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, 0.8)))
+        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, Param.ANCHOR_THRESHOLD)))
+        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, Param.ANCHOR_THRESHOLD)))
 
         DebugPrint('top values', top_values)
 
@@ -102,7 +102,7 @@ class FasterRCNN():
             ious = self.nms_loop_np(final_box_temp)
             nms_boxes_list.append(
                 final_box_temp[0, :])  # since it's sorted by the value, here we can pick the first one each time.
-            final_box_temp = final_box_temp[ious < 0.5]
+            final_box_temp = final_box_temp[ious < Param.RPN_NMS_THRESHOLD]
         print(len(nms_boxes_list))
 
         # Need to convert above instructions to tf operations
@@ -155,8 +155,8 @@ class FasterRCNN():
     def train(self):
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data()
         self.RPN_train_model.fit([inputs, anchor_targets, bbox_reg_targets],
-                                 batch_size=1,
-                                 epochs=24)
+                                 batch_size=Param.BATCH,
+                                 epochs=Param.EPOCH)
 
     def save_weight(self):
         self.RPN_model.save_weights(filepath=f"{Param.PATH_MODEL}/RPN_model")
