@@ -1,10 +1,12 @@
-from NN_Parts import Backbone, RPN
+from NN_Parts import Backbone, RPN, RoI
 from Data_Helper import coco_tools
 import numpy as np
 from NN_Helper import NN_data_generator, gen_candidate_anchors, bbox_tools
 import tensorflow as tf
 from Debugger import DebugPrint
 from FasterRCNN_config import Param
+import pickle
+import os
 
 
 class FasterRCNN():
@@ -12,10 +14,16 @@ class FasterRCNN():
         b1 = Backbone(IMG_SHAPE=IMG_SHAPE)
         self.IMG_SHAPE = IMG_SHAPE
         self.backbone_model = b1.backbone_model
+        # === RPN part ===
         self.RPN = RPN(self.backbone_model, Param.LAMBDA_FACTOR, Param.BATCH)
         self.RPN_model = self.RPN.RPN_model
         self.RPN_train_model = self.RPN.RPN_train_model
 
+        # === RoI part ===
+        self.RoI = RoI(self.backbone_model, self.IMG_SHAPE, Param.N_STAGE)
+        self.RoI_train_model = self.RoI.RoI_train_model
+
+        # === Data part ===
         self.train_data_generator = NN_data_generator(
             file=f"{Param.PATH_DATA}/{Param.DATASET_ID}/annotations/train.json",
             imagefolder_path=Param.PATH_IMAGES)
@@ -25,7 +33,7 @@ class FasterRCNN():
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
 
     def test_loss_function(self):
-        inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data()
+        inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data_RPN()
         print(inputs.shape, anchor_targets.shape, bbox_targets.shape)
         input1 = np.reshape(inputs[0, :, :, :], (1, 720, 1280, 3))
         anchor1 = np.reshape(anchor_targets[0, :, :, :], (1, 23, 40, 9))
@@ -39,8 +47,14 @@ class FasterRCNN():
 
     def test_proposal_visualization(self):
         # === Prediction part ===
-        inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data()
-        print(inputs.shape, anchor_targets.shape, bbox_targets.shape)
+        if os.path.isfile('train_data_temp.pkl'):
+            with open('train_data_temp.pkl', 'rb') as f:
+                inputs, anchor_targets, bbox_reg_targets = pickle.load(f)
+        else:
+            inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN()
+            with open('train_data_temp.pkl', 'wb') as f:
+                pickle.dump([inputs, anchor_targets, bbox_reg_targets], f)
+        print(inputs.shape, anchor_targets.shape, bbox_reg_targets.shape)
         input1 = np.reshape(inputs[0, :, :, :], (1, 720, 1280, 3))
         RPN_Anchor_Pred, RPN_BBOX_Regression_Pred = self.RPN_model.predict(input1, batch_size=1)
         print(RPN_Anchor_Pred.shape, RPN_BBOX_Regression_Pred.shape)
@@ -113,11 +127,16 @@ class FasterRCNN():
 
         original_boxes = self.cocotool.GetOriginalBboxesList(image_id=self.cocotool.image_ids[0])
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=original_boxes, show=True)
-        true_boxes = self.train_data_generator.gen_true_bbox_candidates(image_id=self.cocotool.image_ids[0])
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=true_boxes, show=True)
+        target_anchor_boxes, target_classes = self.train_data_generator.gen_target_anchor_bboxes_classes(image_id=self.cocotool.image_ids[0])
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=target_anchor_boxes, show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=base_boxes.tolist(), show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True)
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=nms_boxes_list, show=True)
+
+    def test_RoI_visualization(self):
+        # === prediction part ===
+        pass
+
 
     def nms_loop_np(self, boxes):
         # boxes : (N, 4), box_1target : (4,)
@@ -152,8 +171,14 @@ class FasterRCNN():
     def nms_loop_tf(self,boxes):
         ious = tf.numpy_function(func=self.nms_loop_np, inp=[boxes], Tout=tf.float32)
 
-    def train(self):
-        inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data()
+    def train(self, load_data=False):
+        if load_data and os.path.isfile('train_data_temp.pkl'):
+            with open('train_data_temp.pkl', 'rb') as f:
+                inputs, anchor_targets, bbox_reg_targets = pickle.load(f)
+        else:
+            inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN()
+            with open('train_data_temp.pkl', 'wb') as f:
+                pickle.dump([inputs, anchor_targets, bbox_reg_targets], f)
         self.RPN_train_model.fit([inputs, anchor_targets, bbox_reg_targets],
                                  batch_size=Param.BATCH,
                                  epochs=Param.EPOCH)
@@ -174,7 +199,7 @@ if __name__ == '__main__':
     # t1, t2 = f1.RPN_model.predict(np.array([img1]))
     # print(t1, t2)
     # f1.test_proposal_visualization()
-    # f1.train()
+    # f1.train(load_data=True)
     # f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()

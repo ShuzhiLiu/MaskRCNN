@@ -9,20 +9,7 @@ from copy import deepcopy
 
 class coco_tools:
     def __init__(self, file, imagefolder_path):
-        self.imagefolder_path = imagefolder_path
-        self.file = file
-        with open(file, 'r') as f:
-            dict1 = json.load(f)
-        self.info = dict1["info"]
-        self.licenses = dict1["licenses"]
-        self.images = dict1["images"]
-        self.annotations = dict1["annotations"]
-        self.categories = dict1["categories"]
-        self.segment_info = dict1["segment_info"]
-        self.image_ids = []
-        for image in self.images:
-            if image['id'] not in self.image_ids:
-                self.image_ids.append(image['id'])
+        self.LoadAnnoCOCO(file, imagefolder_path)
 
     def DrawSegmFromAnnoCoco(self, image_id, Original_Image, annos, show=False, savefile=False):
         height, width = self.GetImageShape(image_id)
@@ -93,6 +80,7 @@ class coco_tools:
 
     def LoadAnnoCOCO(self, file, imagefolder_path):
         self.imagefolder_path = imagefolder_path
+        self.file = file
         with open(file, 'r') as f:
             dict1 = json.load(f)
         self.info = dict1["info"]
@@ -105,6 +93,12 @@ class coco_tools:
         for image in self.images:
             if image['id'] not in self.image_ids:
                 self.image_ids.append(image['id'])
+        count = 0
+        self.category2sparse_onehot = {}
+        for category in self.categories:
+            if category['id'] not in self.category2sparse_onehot:
+                self.category2sparse_onehot[category['id']] = count
+                count += 1
 
     def GetOriginalImage(self, image_id):
         image_name = self.GetImageName(image_id)
@@ -121,6 +115,15 @@ class coco_tools:
                 bbox[0], bbox[1], bbox[2], bbox[3] = bbox[1], bbox[0], bbox[1] + bbox[3], bbox[0] + bbox[2]
                 Bboxes.append(bbox)
         return Bboxes
+
+    def GetOriginalCategorySparseList(self, image_id):
+        CategoriesSparse = []
+        for anno in self.annotations:
+            if anno['image_id'] == image_id:
+                Sparse = self.category2sparse_onehot[anno['category_id']]
+                CategoriesSparse.append(Sparse)
+        return CategoriesSparse
+
 
     def GetOriginalSegmsMaskList(self, image_id):
         # TODO: put mask list to dictionary of labels

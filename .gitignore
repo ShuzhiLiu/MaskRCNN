@@ -3,5 +3,6 @@
 
 *.png
 *.jpg
+*.pkl
 
 /SavedModels

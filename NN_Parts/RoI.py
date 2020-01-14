@@ -2,6 +2,7 @@ from Debugger import DebugPrint
 import numpy as np
 import tensorflow as tf
 from NN_Parts import Backbone
+from FasterRCNN_config import Param
 
 class RoI:
     def __init__(self, backbone_model, IMG_SHAPE, n_stage= 5):
@@ -19,11 +20,13 @@ class RoI:
         flatten1 = tf.keras.layers.GlobalAveragePooling2D()(image_crop)
         fc1 = tf.keras.layers.Dense(units=2048, activation='relu')(flatten1)
         fc2 = tf.keras.layers.Dense(units=2048, activation='relu')(fc1)
-        class_header = tf.keras.layers.Dense(units=80, activation='softmax')(fc2)
+        class_header = tf.keras.layers.Dense(units=81, activation='softmax')(fc2)
         box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc2)
 
-        self.RoI_model = tf.keras.Model(inputs=[self.base_model.input, proposal_boxes], outputs=[class_header, box_reg_header])
-        tf.keras.utils.plot_model(self.RoI_model, 'RoI_with_backbone.png', show_shapes=True)
+        self.RoI_train_model = tf.keras.Model(inputs=[self.base_model.input, proposal_boxes], outputs=[class_header, box_reg_header])
+        self.RoI_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=Param.LR),
+                                     loss=['sparse_categorical_crossentropy','huber_loss'])
+        tf.keras.utils.plot_model(self.RoI_train_model, 'RoI_with_backbone.png', show_shapes=True)
 
 
 
