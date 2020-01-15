@@ -6,6 +6,7 @@ from Data_Helper import coco_tools
 import random
 from NN_Helper import bbox_tools, gen_candidate_anchors
 import tensorflow as tf
+from tensorflow.keras.utils import Sequence
 
 
 
@@ -155,10 +156,30 @@ class NN_data_generator():
             candidate_boxes = self.anchor_generator.anchor_candidates[np.where(ious_temp == 1)]
             n = candidate_boxes.shape[0]
             for i in range(n):
-                target_anchor_bboxes.append(candidate_boxes[i])
+                target_anchor_bboxes.append(candidate_boxes[i].astype(np.float))
                 target_classes.append(SparseTargets[index])
-                input_images.append(original_img)
+                input_images.append(original_img.astype(np.float))
         return input_images ,target_anchor_bboxes, target_classes
+
+    def gen_train_data_RoI_generator(self):
+        input_images, target_anchor_bboxes, target_classes, bbox_reg_targets = [], [], [], []
+        n_len = 80
+        while len(input_images) < n_len:
+            image_id = random.choice(self.dataset_coco.image_ids)
+            input_img, tar_an_b, tar_cls = self._gen_train_data_RoI_one(image_id)
+            input_images += input_img
+            target_anchor_bboxes += tar_an_b
+            target_classes += tar_cls
+            anchor_target, bbox_reg_target = self.gen_train_target(image_id)
+            bbox_reg_target = bbox_reg_target[anchor_target>0]
+            bbox_reg_targets += bbox_reg_target.tolist()
+        input_images, target_anchor_bboxes, target_classes, bbox_reg_targets =input_images[:n_len], target_anchor_bboxes[:n_len], target_classes[:n_len], bbox_reg_targets[:n_len]
+        input_images = np.asarray(input_images).astype(np.float)
+        target_anchor_bboxes = np.asarray(target_anchor_bboxes).astype(np.float)
+        target_classes = np.asarray(target_classes).astype(np.float)
+        bbox_reg_targets = np.asarray(bbox_reg_targets).astype(np.float)
+        print(input_images.shape, target_anchor_bboxes.shape,target_classes.shape, bbox_reg_targets.shape)
+        return ([input_images, target_anchor_bboxes], [target_classes, bbox_reg_targets])
 
     def gen_train_data_RoI(self):
         input_images, target_anchor_bboxes, target_classes = [],[],[]
@@ -206,6 +227,18 @@ class NN_data_generator():
         img1 = (img1 * 0.5 + temp_img * 0.5).astype(np.uint8)
         plt.imshow(img1, cmap='gray')
         plt.show()
+
+class RoI_generator(Sequence):
+
+    def __init__(self,data_generator:NN_data_generator):
+        self.generator = data_generator
+        self.batch_size = 4
+
+    def __len__(self):
+        return int(np.ceil(100 / float(self.batch_size)))
+
+    def __getitem__(self, idx):
+        return self.generator.gen_train_data_RoI_generator()
 
 
 

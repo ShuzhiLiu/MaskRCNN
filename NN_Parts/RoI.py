@@ -25,7 +25,7 @@ class RoI:
 
         self.RoI_train_model = tf.keras.Model(inputs=[self.base_model.input, proposal_boxes], outputs=[class_header, box_reg_header])
         self.RoI_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=Param.LR),
-                                     loss=['sparse_categorical_crossentropy','huber_loss'])
+                                     loss=['sparse_categorical_crossentropy','huber_loss'], loss_weights=[1,10])
         tf.keras.utils.plot_model(self.RoI_train_model, 'RoI_with_backbone.png', show_shapes=True)
 
 

@@ -1,7 +1,7 @@
 from NN_Parts import Backbone, RPN, RoI
 from Data_Helper import coco_tools
 import numpy as np
-from NN_Helper import NN_data_generator, gen_candidate_anchors, bbox_tools
+from NN_Helper import NN_data_generator, gen_candidate_anchors, bbox_tools, RoI_generator
 import tensorflow as tf
 from Debugger import DebugPrint
 from FasterRCNN_config import Param
@@ -47,12 +47,12 @@ class FasterRCNN():
 
     def test_proposal_visualization(self):
         # === Prediction part ===
-        if os.path.isfile('train_data_temp.pkl'):
-            with open('train_data_temp.pkl', 'rb') as f:
+        if os.path.isfile('train_data_RPN_temp.pkl'):
+            with open('train_data_RPN_temp.pkl', 'rb') as f:
                 inputs, anchor_targets, bbox_reg_targets = pickle.load(f)
         else:
             inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN()
-            with open('train_data_temp.pkl', 'wb') as f:
+            with open('train_data_RPN_temp.pkl', 'wb') as f:
                 pickle.dump([inputs, anchor_targets, bbox_reg_targets], f)
         print(inputs.shape, anchor_targets.shape, bbox_reg_targets.shape)
         input1 = np.reshape(inputs[0, :, :, :], (1, 720, 1280, 3))
@@ -135,7 +135,21 @@ class FasterRCNN():
 
     def test_RoI_visualization(self):
         # === prediction part ===
-        pass
+        if os.path.isfile('train_data_RoI_temp.pkl'):
+            with open('train_data_RoI_temp.pkl', 'rb') as f:
+                input_images, target_anchor_bboxes, target_classes = pickle.load(f)
+        else:
+            input_images, target_anchor_bboxes, target_classes = self.train_data_generator._gen_train_data_RoI_one(self.train_data_generator.dataset_coco.image_ids[0])
+            input_images, target_anchor_bboxes, target_classes = np.asarray(input_images).astype(np.float), np.asarray(target_anchor_bboxes), np.asarray(target_classes)
+            with open('train_data_RoI_temp.pkl', 'wb') as f:
+                pickle.dump([input_images, target_anchor_bboxes, target_classes], f)
+        # TODO:check tf.image.crop_and_resize
+        input_images2 = input_images[:2].astype(np.float)
+        print(input_images2.shape)
+        target_anchor_bboxes2 = target_anchor_bboxes[:2].astype(np.float)
+        print(target_anchor_bboxes2.shape)
+        class_header, box_reg_header = self.RoI_train_model.predict([input_images2, target_anchor_bboxes2])
+        print(class_header.shape,box_reg_header.shape)
 
 
     def nms_loop_np(self, boxes):
@@ -171,17 +185,26 @@ class FasterRCNN():
     def nms_loop_tf(self,boxes):
         ious = tf.numpy_function(func=self.nms_loop_np, inp=[boxes], Tout=tf.float32)
 
-    def train(self, load_data=False):
-        if load_data and os.path.isfile('train_data_temp.pkl'):
-            with open('train_data_temp.pkl', 'rb') as f:
+    def train_RPN(self, load_data=False):
+        if load_data and os.path.isfile('train_data_RPN_temp.pkl'):
+            with open('train_data_RPN_temp.pkl', 'rb') as f:
                 inputs, anchor_targets, bbox_reg_targets = pickle.load(f)
         else:
             inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN()
-            with open('train_data_temp.pkl', 'wb') as f:
+            with open('train_data_RPN_temp.pkl', 'wb') as f:
                 pickle.dump([inputs, anchor_targets, bbox_reg_targets], f)
         self.RPN_train_model.fit([inputs, anchor_targets, bbox_reg_targets],
                                  batch_size=Param.BATCH,
                                  epochs=Param.EPOCH)
+    def train_RoI(self, load_data=False):
+        x,y = self.train_data_generator.gen_train_data_RoI_generator()
+        self.RoI_train_model.fit(x=x,
+                                 y=y,
+                                 batch_size=4,
+                                 epochs=2)
+        # TODO: complete the generator below
+        # generator = RoI_generator(self.train_data_generator)
+        # self.RoI_train_model.fit_generator(generator, steps_per_epoch=25, epochs=1,max_queue_size=0,use_multiprocessing=False)
 
     def save_weight(self):
         self.RPN_model.save_weights(filepath=f"{Param.PATH_MODEL}/RPN_model")
@@ -199,7 +222,9 @@ if __name__ == '__main__':
     # t1, t2 = f1.RPN_model.predict(np.array([img1]))
     # print(t1, t2)
     # f1.test_proposal_visualization()
-    # f1.train(load_data=True)
+    # f1.train_RPN(load_data=True)
+    f1.train_RoI(load_data=True)
     # f1.save_weight()
-    f1.load_weight()
-    f1.test_proposal_visualization()
+    # f1.load_weight()
+    # f1.test_proposal_visualization()
+    f1.test_RoI_visualization()
