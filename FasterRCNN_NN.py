@@ -191,12 +191,13 @@ class FasterRCNN():
         self.RPN_train_model.fit([inputs, anchor_targets, bbox_reg_targets],
                                  batch_size=Param.BATCH,
                                  epochs=Param.EPOCH)
-    def train_RoI(self, load_data=False):
-        x,y = self.train_data_generator.gen_train_data_RoI_generator()
-        self.RoI_train_model.fit(x=x,
-                                 y=y,
-                                 batch_size=4,
-                                 epochs=2)
+    def train_RoI(self):
+        for _ in range(100):
+            x,y = self.train_data_generator.gen_train_data_RoI_generator()
+            self.RoI_train_model.fit(x=x,
+                                     y=y,
+                                     batch_size=4,
+                                     epochs=1)
         # TODO: complete the generator below
         # generator = RoI_generator(self.train_data_generator)
         # self.RoI_train_model.fit_generator(generator, steps_per_epoch=25, epochs=1,max_queue_size=0,use_multiprocessing=False)
@@ -218,8 +219,9 @@ if __name__ == '__main__':
     # print(t1, t2)
     # f1.test_proposal_visualization()
     # f1.train_RPN(load_data=True)
-    # f1.train_RoI(load_data=True)
     # f1.save_weight()
-    # f1.load_weight()
-    # f1.test_proposal_visualization()
-    f1.test_RoI_visualization()
+    f1.load_weight()
+    f1.test_proposal_visualization()
+    # f1.test_RoI_visualization()
+    # f1.train_RoI()
+    # f1.test_RoI_visualization()
