@@ -95,9 +95,11 @@ class coco_tools:
                 self.image_ids.append(image['id'])
         count = 0
         self.category2sparse_onehot = {}
+        self.sparse_onehot2category = []
         for category in self.categories:
             if category['id'] not in self.category2sparse_onehot:
                 self.category2sparse_onehot[category['id']] = count
+                self.sparse_onehot2category.append(category['id'])
                 count += 1
 
     def GetOriginalImage(self, image_id):

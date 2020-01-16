@@ -135,21 +135,16 @@ class FasterRCNN():
 
     def test_RoI_visualization(self):
         # === prediction part ===
-        if os.path.isfile('train_data_RoI_temp.pkl'):
-            with open('train_data_RoI_temp.pkl', 'rb') as f:
-                input_images, target_anchor_bboxes, target_classes = pickle.load(f)
-        else:
-            input_images, target_anchor_bboxes, target_classes = self.train_data_generator._gen_train_data_RoI_one(self.train_data_generator.dataset_coco.image_ids[0])
-            input_images, target_anchor_bboxes, target_classes = np.asarray(input_images).astype(np.float), np.asarray(target_anchor_bboxes), np.asarray(target_classes)
-            with open('train_data_RoI_temp.pkl', 'wb') as f:
-                pickle.dump([input_images, target_anchor_bboxes, target_classes], f)
+        input_images, target_anchor_bboxes, target_classes = self.train_data_generator._gen_train_data_RoI_one(self.train_data_generator.dataset_coco.image_ids[0])
+        input_images, target_anchor_bboxes, target_classes = np.asarray(input_images).astype(np.float), np.asarray(target_anchor_bboxes), np.asarray(target_classes)
         # TODO:check tf.image.crop_and_resize
-        input_images2 = input_images[:2].astype(np.float)
+        input_images2 = input_images[:1].astype(np.float)
         print(input_images2.shape)
-        target_anchor_bboxes2 = target_anchor_bboxes[:2].astype(np.float)
+        target_anchor_bboxes2 = target_anchor_bboxes[:1].astype(np.float)
         print(target_anchor_bboxes2.shape)
         class_header, box_reg_header = self.RoI_train_model.predict([input_images2, target_anchor_bboxes2])
         print(class_header.shape,box_reg_header.shape)
+        print(class_header)
 
 
     def nms_loop_np(self, boxes):
@@ -223,7 +218,7 @@ if __name__ == '__main__':
     # print(t1, t2)
     # f1.test_proposal_visualization()
     # f1.train_RPN(load_data=True)
-    f1.train_RoI(load_data=True)
+    # f1.train_RoI(load_data=True)
     # f1.save_weight()
     # f1.load_weight()
     # f1.test_proposal_visualization()

@@ -10,7 +10,7 @@ class RoI:
         proposal_boxes = tf.keras.Input(shape=(4,),batch_size = None,name='PROPOSAL_BOXES')
         shape1 = tf.shape(proposal_boxes)
         n_boxes = tf.gather_nd(shape1, [0])
-        indices = tf.ones(shape=n_boxes, dtype=tf.int32)
+        indices = tf.range(start=0, limit=n_boxes, dtype=tf.int32)
         img_shape_constant = tf.constant([IMG_SHAPE[0], IMG_SHAPE[1], IMG_SHAPE[0], IMG_SHAPE[1]], tf.float32)
         proposal_boxes2 = tf.math.divide(proposal_boxes, img_shape_constant)
 
