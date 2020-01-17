@@ -52,6 +52,9 @@ class RPN:
 
         self._RPN_train_model()
 
+        # --- for low level training ---
+        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+
     def _RPN_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
         self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression,
@@ -69,6 +72,7 @@ class RPN:
         self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001))
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
+
 
     def _RPN_loss(self, anchor_target, bbox_reg_target, anchor_pred, bbox_reg_pred):
         # shape of input anchor_target: (batch_size=1, h, w, n_anchors)
@@ -126,6 +130,14 @@ class RPN:
         total_loss = tf.add(anchor_loss, bbox_reg_loss)
 
         return total_loss
+
+    @tf.function
+    def train_step(self, image, anchor_target, box_reg_target):
+        with tf.GradientTape() as RoI_tape:
+            anchor_pred, box_reg_pred = self.RPN_model(image)
+            total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
+        gradients = RoI_tape.gradient(total_loss, self.RPN_model.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.RPN_model.trainable_variables))
 
 
 if __name__ == '__main__':
