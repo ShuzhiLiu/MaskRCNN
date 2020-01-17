@@ -18,10 +18,10 @@ class RoI:
 
         image_crop = tf.image.crop_and_resize(self.base_model.output, proposal_boxes2,indices, [6,6])
         flatten1 = tf.keras.layers.GlobalAveragePooling2D()(image_crop)
-        fc1 = tf.keras.layers.Dense(units=2048, activation='relu')(flatten1)
-        fc2 = tf.keras.layers.Dense(units=2048, activation='relu')(fc1)
-        class_header = tf.keras.layers.Dense(units=81, activation='softmax')(fc2)
-        box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc2)
+        fc1 = tf.keras.layers.Dense(units=1024, activation='relu')(flatten1)
+        # fc2 = tf.keras.layers.Dense(units=2048, activation='relu')(fc1)
+        class_header = tf.keras.layers.Dense(units=81, activation='softmax')(fc1)
+        box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc1)
 
         self.RoI_train_model = tf.keras.Model(inputs=[self.base_model.input, proposal_boxes], outputs=[class_header, box_reg_header])
         self.RoI_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=Param.LR),

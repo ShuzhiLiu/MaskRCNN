@@ -1,7 +1,8 @@
 class Param:
     # === can't change now ===
     N_STAGE = 5
-    BATCH = 1
+    BATCH_RPN = 1
+    BATCH_RoI = 4
     # === could change now ===
 
     # --- RPN ---
@@ -11,7 +12,7 @@ class Param:
     EPOCH = 12
     IMG_SHAPE = (720,1280,3)
     ANCHOR_PROPOSAL_N = 300
-    ANCHOR_THRESHOLD = 0.8
+    ANCHOR_THRESHOLD = 0.6
     RPN_NMS_THRESHOLD = 0.5
     # PATH_DATA = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
     # PATH_IMAGES = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
