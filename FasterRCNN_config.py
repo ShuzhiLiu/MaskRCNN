@@ -7,12 +7,13 @@ class Param:
 
     # --- RPN ---
     PATH_MODEL = 'SavedModels'
+    PATH_DEBUG_IMG = 'SavedDebugImages'
     LR = 0.0001
     LAMBDA_FACTOR = 3   # Don't change now! This factor is for balancing the RPN losses.
     EPOCH = 24
     IMG_SHAPE = (720,1280,3)
     ANCHOR_PROPOSAL_N = 300
-    ANCHOR_THRESHOLD = 0.8
+    ANCHOR_THRESHOLD = 0.5
     RPN_NMS_THRESHOLD = 0.5
     # PATH_DATA = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
     # PATH_IMAGES = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'

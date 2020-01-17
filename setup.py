@@ -1,6 +1,7 @@
 import os
 
 dir_list = ['SavedModels',
+            'SavedDebugImages',
             'TensorboardLogs']
 
 for directory in dir_list:

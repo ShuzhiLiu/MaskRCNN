@@ -42,7 +42,7 @@ class coco_tools:
         if savefile:
             plt.savefig(f'{os.getcwd()}/Images_Drawn/{image_id}.jpg', dpi=300)
 
-    def DrawBboxes(self, Original_Image, Bboxes, show=False, savefile=False):
+    def DrawBboxes(self, Original_Image, Bboxes, show=False, savefile=False, path=None, savename=None):
         # bbox is numpy format (x1, y1, x2, y2)
         height, width = Original_Image.shape[0], Original_Image.shape[1]
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
@@ -59,7 +59,8 @@ class coco_tools:
         if show:
             plt.show()
         if savefile:
-            plt.savefig(f'{os.getcwd()}/Images_Drawn/11111111111.jpg', dpi=300)
+            img_opencv = cv2.cvtColor(Original_Image, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(filename=f"{path}/{savename}.jpg", img=img_opencv)
 
     def GetSegmMaskFromAnnoCOCO(self, annos, image_id):
         segms = []
