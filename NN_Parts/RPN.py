@@ -4,11 +4,11 @@ import random
 import numpy as np
 from Debugger import DebugPrint
 
-
 class RPN:
-    def __init__(self, backbone_model, lambda_factor=1, batch=1):
+    def __init__(self, backbone_model, lambda_factor=1, batch=1, lr=1e-4):
         self.LAMBDA_FACTOR = lambda_factor
         self.BATCH = batch
+        self.lr = lr
         # the part of backbone
         back_outshape = backbone_model.output.shape[1:]
 
@@ -53,7 +53,7 @@ class RPN:
         self._RPN_train_model()
 
         # --- for low level training ---
-        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer = tf.keras.optimizers.Adam(self.lr)
 
     def _RPN_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
@@ -69,7 +69,7 @@ class RPN:
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
                                                             anchor_pred=self.RPN_Anchor_Pred,
                                                             bbox_reg_pred=self.RPN_BBOX_Regression_Pred))
-        self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=0.001))
+        self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr))
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
 

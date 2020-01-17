@@ -5,8 +5,9 @@ from NN_Parts import Backbone
 from FasterRCNN_config import Param
 
 class RoI:
-    def __init__(self, backbone_model, IMG_SHAPE, n_stage= 5):
+    def __init__(self, backbone_model, IMG_SHAPE, lr=1e-4, n_stage= 5):
         self.base_model = backbone_model
+        self.lr = lr
         proposal_boxes = tf.keras.Input(shape=(4,),batch_size = None,name='PROPOSAL_BOXES')
         shape1 = tf.shape(proposal_boxes)
         n_boxes = tf.gather_nd(shape1, [0])
@@ -30,7 +31,7 @@ class RoI:
 
         # --- for train step ---
         self.huber = tf.keras.losses.Huber()
-        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+        self.optimizer = tf.keras.optimizers.Adam(self.lr)
 
 
     @tf.function

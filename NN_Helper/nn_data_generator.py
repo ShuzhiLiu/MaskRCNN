@@ -15,7 +15,7 @@ class NN_data_generator():
         self.dataset_coco = coco_tools(file, imagefolder_path)
         self.anchor_generator = gen_candidate_anchors(img_shape=img_shape, n_stage=n_stage)
 
-    def gen_train_target(self, image_id, debuginfo=False):
+    def gen_train_target_anchor_boxreg(self, image_id, debuginfo=False):
         bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
 
         bboxes_ious = []    # for each gt_bbox calculate ious with candidates
@@ -170,7 +170,7 @@ class NN_data_generator():
             input_images += input_img
             target_anchor_bboxes += tar_an_b
             target_classes += tar_cls
-            anchor_target, bbox_reg_target = self.gen_train_target(image_id)
+            anchor_target, bbox_reg_target = self.gen_train_target_anchor_boxreg(image_id)
             bbox_reg_target = bbox_reg_target[anchor_target>0]
             bbox_reg_targets += bbox_reg_target.tolist()
         input_images, target_anchor_bboxes, target_classes, bbox_reg_targets =input_images[:n_len], target_anchor_bboxes[:n_len], target_classes[:n_len], bbox_reg_targets[:n_len]
@@ -195,16 +195,17 @@ class NN_data_generator():
     def gen_train_input(self, image_id):
         return self.dataset_coco.GetOriginalImage(image_id=image_id)
 
+
     def gen_train_data_RPN(self):
         inputs = []
         anchor_targets = []
         bbox_reg_targets = []
         for image_id in self.dataset_coco.image_ids:
             inputs.append(self.gen_train_input(image_id))
-            anchor_target, bbox_reg_target = self.gen_train_target(image_id)
+            anchor_target, bbox_reg_target = self.gen_train_target_anchor_boxreg(image_id)
             anchor_targets.append(anchor_target)
             bbox_reg_targets.append(bbox_reg_target)
-        return np.array(inputs), np.array(anchor_targets), np.array(bbox_reg_targets)
+        return np.array(inputs).astype(np.float), np.array(anchor_targets), np.array(bbox_reg_targets)
 
 
     def _validate_bbox(self,image_id, bboxes):
@@ -252,7 +253,7 @@ def test2():
     bboxes = t1.dataset_coco.GetOriginalBboxesList(image_id=image_id)
     t1._validate_bbox(image_id=image_id, bboxes=bboxes)
     t1._validata_masks(image_id=image_id)
-    t1.gen_train_target(image_id=image_id)
+    t1.gen_train_target_anchor_boxreg(image_id=image_id)
 
 
 def test():
