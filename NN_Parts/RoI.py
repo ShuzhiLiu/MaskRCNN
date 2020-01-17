@@ -24,9 +24,27 @@ class RoI:
         box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc1)
 
         self.RoI_train_model = tf.keras.Model(inputs=[self.base_model.input, proposal_boxes], outputs=[class_header, box_reg_header])
-        self.RoI_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=Param.LR),
-                                     loss=['sparse_categorical_crossentropy','huber_loss'], loss_weights=[1,10])
+        # self.RoI_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=Param.LR),
+        #                              loss=['sparse_categorical_crossentropy','huber_loss'], loss_weights=[1,10])
         tf.keras.utils.plot_model(self.RoI_train_model, 'RoI_with_backbone.png', show_shapes=True)
+
+        # --- for train step ---
+        self.huber = tf.keras.losses.Huber()
+        self.optimizer = tf.keras.optimizers.Adam(1e-4)
+
+
+    @tf.function
+    def train_step(self, input_image, proposal_box, class_header, box_reg_header):
+        with tf.GradientTape() as RoI_tape:
+            class_pred, box_reg_pred = self.RoI_train_model([input_image, proposal_box])
+            class_loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=class_header, y_pred=class_pred)
+
+            box_reg_loss = self.huber(y_true=box_reg_header, y_pred=box_reg_pred)
+            total_loss = tf.reduce_mean(tf.add(class_loss, box_reg_loss))
+        gradients = RoI_tape.gradient(total_loss, self.RoI_train_model.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.RoI_train_model.trainable_variables))
+
+
 
 
 
