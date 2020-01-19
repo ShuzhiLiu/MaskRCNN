@@ -37,7 +37,7 @@ class RoI:
         self.optimizer = tf.keras.optimizers.Adam(self.lr)
 
     @tf.function
-    def train_step(self, input_image, proposal_box, class_header, box_reg_header):
+    def train_step_with_backbone(self, input_image, proposal_box, class_header, box_reg_header):
         with tf.GradientTape() as RoI_tape:
             class_pred, box_reg_pred = self.RoI_train_model([input_image, proposal_box])
             class_loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=class_header, y_pred=class_pred)
@@ -46,6 +46,17 @@ class RoI:
             total_loss = tf.reduce_mean(tf.add(class_loss, box_reg_loss))
         gradients = RoI_tape.gradient(total_loss, self.RoI_train_model.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.RoI_train_model.trainable_variables))
+
+    @tf.function
+    def train_step_no_backbone(self, input_image, proposal_box, class_header, box_reg_header):
+        with tf.GradientTape() as RoI_tape:
+            class_pred, box_reg_pred = self.RoI_train_model([input_image, proposal_box])
+            class_loss = tf.keras.losses.sparse_categorical_crossentropy(y_true=class_header, y_pred=class_pred)
+
+            box_reg_loss = self.huber(y_true=box_reg_header, y_pred=box_reg_pred)
+            total_loss = tf.reduce_mean(tf.add(class_loss, box_reg_loss))
+        gradients = RoI_tape.gradient(total_loss, self.RoI_header_model.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.RoI_header_model.trainable_variables))
 
 
 if __name__ == '__main__':

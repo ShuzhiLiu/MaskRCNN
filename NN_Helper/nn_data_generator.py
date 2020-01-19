@@ -132,11 +132,11 @@ class NN_data_generator():
         return target_anchor_bboxes, target_classes
 
     def _gen_train_data_RoI_one(self,image_id):
-        bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
+        gt_bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
         SparseTargets = self.dataset_coco.GetOriginalCategorySparseList(image_id=image_id)
 
         bboxes_ious = []  # for each gt_bbox calculate ious with candidates
-        for bbox in bboxes:
+        for bbox in gt_bboxes:
             ious = bbox_tools.ious(self.anchor_generator.anchor_candidates_list, bbox)
             ious_temp = np.ones(shape=(len(ious)), dtype=np.float) * 0.5
             # other author's implementations are use -1 to indicate ignoring, here use 0.5 to use max
@@ -148,25 +148,30 @@ class NN_data_generator():
         # for each gt_box, determine the box reg target
         original_img = self.gen_train_input(image_id)
         input_images = []
-        target_anchor_bboxes = []
+        input_box_fromAnchorBox = []
         target_classes = []
+        target_bbox_reg = []
         for index, bbox_ious in enumerate(bboxes_ious):
-            ious_temp = np.reshape(bbox_ious, newshape=(
-            self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
+            ious_temp = np.reshape(bbox_ious, newshape=(self.anchor_generator.h,
+                                                        self.anchor_generator.w,
+                                                        self.anchor_generator.n_anchors))
             candidate_boxes = self.anchor_generator.anchor_candidates[np.where(ious_temp == 1)]
             n = candidate_boxes.shape[0]
             for i in range(n):
-                target_anchor_bboxes.append(candidate_boxes[i].astype(np.float))
+                input_box_fromAnchorBox.append(candidate_boxes[i].astype(np.float))
+                box_reg = bbox_tools.bbox_regression_target(pred_boxes=candidate_boxes[i].reshape((1,4)), gt_box=gt_bboxes[index])
+                target_bbox_reg.append(box_reg.ravel())
                 target_classes.append(SparseTargets[index])
                 input_images.append(original_img.astype(np.float))
-        return input_images ,target_anchor_bboxes, target_classes
+        return input_images ,input_box_fromAnchorBox, target_classes, target_bbox_reg
 
     def gen_train_data_RoI_generator(self):
+        # abandoned already, find a time to clean this part
         input_images, target_anchor_bboxes, target_classes, bbox_reg_targets = [], [], [], []
         n_len = 80
         while len(input_images) < n_len:
             image_id = random.choice(self.dataset_coco.image_ids)
-            input_img, tar_an_b, tar_cls = self._gen_train_data_RoI_one(image_id)
+            input_img, tar_an_b, tar_cls, bbox_reg_target_RoI = self._gen_train_data_RoI_one(image_id)
             input_images += input_img
             target_anchor_bboxes += tar_an_b
             target_classes += tar_cls

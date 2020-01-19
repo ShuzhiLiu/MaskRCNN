@@ -7,8 +7,9 @@ from Debugger import DebugPrint
 from FasterRCNN_config import Param
 import pickle
 import os
+import random
 
-os.environ['KMP_DUPLICATE_LIB_OK']='True'
+os.environ['KMP_DUPLICATE_LIB_OK']='True'   # for mac os tensorflow setting
 # tf.keras.backend.set_floatx('float64')
 
 class FasterRCNN():
@@ -23,7 +24,7 @@ class FasterRCNN():
         self.RPN_train_model = self.RPN.RPN_train_model
 
         # === RoI part ===
-        self.RoI = RoI(self.backbone_model, self.IMG_SHAPE, Param.N_STAGE)
+        self.RoI = RoI(self.backbone_model, self.IMG_SHAPE, Param.LR, Param.N_STAGE)
         self.RoI_train_model = self.RoI.RoI_train_model
 
         # === Data part ===
@@ -202,7 +203,7 @@ class FasterRCNN():
     def train_RoI(self):
         for _ in range(100):
             x,y = self.train_data_generator.gen_train_data_RoI_generator()
-            self.RoI.train_step(x[0][:2],x[1][:2],y[0][:2],y[1][:2])
+            self.RoI.train_step_with_backbone(x[0][:2], x[1][:2], y[0][:2], y[1][:2])
             print('trained one step')
             # self.RoI_train_model.fit(x=x,
             #                          y=y,
@@ -214,6 +215,7 @@ class FasterRCNN():
 
     def train_RPN_RoI(self,load_data=False):
         inputs, anchor_targets, bbox_reg_targets = self.get_train_data_RPN(load_data)
+        # print(f"box reg target shape: {bbox_reg_targets.shape}")
         n_sample = inputs.shape[0]
         image_ids = self.train_data_generator.dataset_coco.image_ids
         for epoch in range(Param.EPOCH):
@@ -221,11 +223,13 @@ class FasterRCNN():
             for i in range(n_sample):
                 # print(f'{i} th image')
                 self.RPN.train_step(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
-                input_img, tar_an_b, tar_cls = self.train_data_generator._gen_train_data_RoI_one(image_ids[i])
-                input_img, tar_an_b, tar_cls = np.asarray(input_img).astype(np.float), np.asarray(tar_an_b), np.asarray(tar_cls)
+                input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator._gen_train_data_RoI_one(image_ids[i])
+                input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = np.asarray(input_img).astype(np.float), np.asarray(input_box_fromAnchorBox), np.asarray(target_class), np.asarray(target_bbox_reg)
                 n_box = input_img.shape[0]
                 for j in range(n_box):
-                    self.RoI.train_step(input_img[j:j+1], tar_an_b[j:j+1], tar_cls[j:j+1], bbox_reg_targets[i][j:j+1])
+                    self.RoI.train_step_no_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1], target_class[j:j + 1], target_bbox_reg[j:j + 1])
+                j = random.randint(a=0, b=n_box-1)    # model with backbone only be trained once to balance RPN and RoI training
+                self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1], target_class[j:j + 1], target_bbox_reg[j:j + 1])
 
 
     def save_weight(self):
@@ -245,8 +249,8 @@ if __name__ == '__main__':
     # print(t1, t2)
     # f1.test_proposal_visualization()
     # f1.train_RPN(load_data=True)
-    # f1.train_RPN_RoI(load_data=True)
-    # f1.save_weight()
+    f1.train_RPN_RoI(load_data=True)
+    f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
     # f1.test_RoI_visualization()
