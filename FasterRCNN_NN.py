@@ -124,11 +124,11 @@ class FasterRCNN():
         final_box = bbox_tools.clip_boxes(final_box, self.IMG_SHAPE)
 
         original_boxes = self.cocotool.GetOriginalBboxesList(image_id=self.cocotool.image_ids[0])
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=original_boxes, show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='1OriginalBoxes')
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=original_boxes, show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='1GroundTruthBoxes')
         target_anchor_boxes, target_classes = self.train_data_generator.gen_target_anchor_bboxes_classes(image_id=self.cocotool.image_ids[0])
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=target_anchor_boxes, show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='2TrueBoxes')
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=base_boxes.tolist(), show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='3AnchorTargetBoxes')
-        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='4PredBoxes')
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=target_anchor_boxes, show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='2TrueAnchorBoxes')
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=base_boxes.tolist(), show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='3PredAnchorBoxes')
+        self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=final_box.tolist(), show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='4PredRegBoxes')
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=nms_boxes_list, show=True, savefile=True, path=Param.PATH_DEBUG_IMG, savename='5PredNMSBoxes')
 
     def test_RoI_visualization(self):
@@ -249,8 +249,8 @@ if __name__ == '__main__':
     # print(t1, t2)
     # f1.test_proposal_visualization()
     # f1.train_RPN(load_data=True)
-    f1.train_RPN_RoI(load_data=True)
-    f1.save_weight()
+    # f1.train_RPN_RoI(load_data=True)
+    # f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
     # f1.test_RoI_visualization()
