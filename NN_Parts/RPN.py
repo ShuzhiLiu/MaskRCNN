@@ -4,6 +4,7 @@ import random
 import numpy as np
 from Debugger import DebugPrint
 
+
 class RPN:
     def __init__(self, backbone_model, lambda_factor=1, batch=1, lr=1e-4):
         self.LAMBDA_FACTOR = lambda_factor
@@ -12,19 +13,15 @@ class RPN:
         # the part of backbone
         back_outshape = backbone_model.output.shape[1:]
 
-        # reorganize base model
-        self.base_model2 = tf.keras.Sequential(layers=[
-            backbone_model,
-            tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
-                                   kernel_initializer='he_normal', name='RPN_START'),
-            tf.keras.layers.BatchNormalization(),
-            tf.keras.layers.Activation(activation=tf.keras.activations.relu)
-        ])
-        # self.base_model2 = backbone_model
+        self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
+                                            kernel_initializer='he_normal', name='RPN_START')(
+            backbone_model.layers[-1].output)
+        self.bh1 = tf.keras.layers.BatchNormalization()(self.conv1)
+        self.ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(self.bh1)
 
         # decide foreground or background
         self.conv2 = tf.keras.layers.Conv2D(filters=18, kernel_size=(1, 1), padding='same',
-                                            kernel_initializer='he_normal')(self.base_model2.output)
+                                            kernel_initializer='he_normal')(self.ac1)
         self.bh2 = tf.keras.layers.BatchNormalization()(self.conv2)
         self.ac2 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(self.bh2)
         self.reshape2 = tf.keras.layers.Reshape(
@@ -34,21 +31,25 @@ class RPN:
 
         # bounding box regression
         self.conv3 = tf.keras.layers.Conv2D(filters=36, kernel_size=(1, 1), padding='same',
-                                            kernel_initializer='he_normal')(self.base_model2.output)
+                                            kernel_initializer='he_normal')(self.ac1)
         self.bh3 = tf.keras.layers.BatchNormalization()(self.conv3)
         self.ac3 = tf.keras.layers.Activation(activation=tf.keras.activations.linear)(self.bh3)
         self.RPN_BBOX_Regression_Pred = tf.keras.layers.Reshape(
             target_shape=(back_outshape[0], back_outshape[1], int(36 / 4), 4), name='RPN_BBOX_Regression_Pred')(
             self.ac3)
 
-        self.RPN_model = tf.keras.Model(inputs=[self.base_model2.input],
-                                        outputs=[self.RPN_Anchor_Pred, self.RPN_BBOX_Regression_Pred], name='RPN_model')
+        self.RPN_with_backbone_model = tf.keras.Model(inputs=[backbone_model.inputs],
+                                                      outputs=[self.RPN_Anchor_Pred, self.RPN_BBOX_Regression_Pred],
+                                                      name='RPN_BACKBONE_MODEL')
 
-        self.shape_Anchor_Target = self.RPN_model.get_layer(name='tf_op_layer_RPN_Anchor_Pred').output.shape[1:-1]
-        self.shape_BBOX_Regression = self.RPN_model.get_layer(name='RPN_BBOX_Regression_Pred').output.shape[1:]
+        self.shape_Anchor_Target = self.RPN_with_backbone_model.get_layer(
+            name='tf_op_layer_RPN_Anchor_Pred').output.shape[1:-1]
+        self.shape_BBOX_Regression = self.RPN_with_backbone_model.get_layer(
+            name='RPN_BBOX_Regression_Pred').output.shape[1:]
         self.N_total_anchors = self.shape_Anchor_Target[0] * self.shape_Anchor_Target[1] * self.shape_Anchor_Target[2]
 
-        tf.keras.utils.plot_model(model=self.RPN_model, to_file='RPN_with_backbone.png', show_shapes=True)
+        # tf.keras.utils.plot_model(model=self.RPN_header_model, to_file='RPN_header_model.png', show_shapes=True)
+        tf.keras.utils.plot_model(model=self.RPN_with_backbone_model, to_file='RPN_with_backbone.png', show_shapes=True)
 
         self._RPN_train_model()
 
@@ -59,11 +60,10 @@ class RPN:
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
         self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression,
                                                          name='RPN_BBOX_Regression_Target')
-        self.RPN_train_model = tf.keras.Model(inputs=[self.RPN_model.input,
+        self.RPN_train_model = tf.keras.Model(inputs=[self.RPN_with_backbone_model.inputs,
                                                       self.RPN_Anchor_Target,
                                                       self.RPN_BBOX_Regression_Target],
-                                              outputs=[self.RPN_Anchor_Pred,
-                                                       self.RPN_BBOX_Regression_Pred],
+                                              outputs=[self.RPN_with_backbone_model.outputs],
                                               name='RPN_train_model')
         self.RPN_train_model.add_loss(losses=self._RPN_loss(anchor_target=self.RPN_Anchor_Target,
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
@@ -72,7 +72,6 @@ class RPN:
         self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr))
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
-
 
     def _RPN_loss(self, anchor_target, bbox_reg_target, anchor_pred, bbox_reg_pred):
         # shape of input anchor_target: (batch_size=1, h, w, n_anchors)
@@ -134,13 +133,12 @@ class RPN:
     @tf.function
     def train_step(self, image, anchor_target, box_reg_target):
         with tf.GradientTape() as RoI_tape:
-            anchor_pred, box_reg_pred = self.RPN_model(image)
+            anchor_pred, box_reg_pred = self.RPN_with_backbone_model(image)
             total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
-        gradients = RoI_tape.gradient(total_loss, self.RPN_model.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients, self.RPN_model.trainable_variables))
+        gradients = RoI_tape.gradient(total_loss, self.RPN_with_backbone_model.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.RPN_with_backbone_model.trainable_variables))
 
 
 if __name__ == '__main__':
     b1 = Backbone()
     t1 = RPN(b1.backbone_model)
-    t1._RPN_train_model()

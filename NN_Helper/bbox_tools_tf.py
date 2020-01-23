@@ -2,17 +2,21 @@ import numpy as np
 import tensorflow as tf
 from NN_Helper import bbox_tools
 
+
 class bbox_tools_tf:
     # Beside ious, format of boxes is numpy.
     # format of boxes is list for ious
-    # TODO: deal with ious function
+    # TODO: tf.numpy_function only works on eager mode, not graph mode!!
     @classmethod
-    def ious(cls, boxes_list, box_1target):
+    def _ious(cls, boxes_np, box_1target):
         # box axis format: (x1,y1,x2,y2)
+        # boxes_np:(?,4), box_1target:(4,)
+        shape = boxes_np.shape
         boxBArea = (box_1target[2] - box_1target[0] + 1) * (box_1target[3] - box_1target[1] + 1)
-        ious = []
-        for box in boxes_list:
+        ious = np.zeros(shape=shape[0])
+        for i in range(shape[0]):
             # determine the (x, y)-coordinates of the intersection rectangle
+            box = boxes_np[i]
             xA = max(box[0], box_1target[0])
             yA = max(box[1], box_1target[1])
             xB = min(box[2], box_1target[2])
@@ -28,9 +32,14 @@ class bbox_tools_tf:
             # compute the intersection over union by taking the intersection
             # area and dividing it by the sum of prediction + ground-truth
             # areas - the interesection area
-            ious.append(interArea / float(boxAArea + boxBArea - interArea))
+            ious[i] = (interArea / float(boxAArea + boxBArea - interArea))
 
         # return the intersection over union value
+        return ious
+
+    @classmethod
+    def ious(cls, boxes_np, box_1target):
+        ious = tf.numpy_function(cls._ious, [boxes_np, box_1target], tf.float32)
         return ious
 
     @classmethod
@@ -42,8 +51,8 @@ class bbox_tools_tf:
     def bbox_reg2truebox(cls, base_boxes, regs):
         # input shape (N,4) , (N,4)
         # tested
-        truebox = tf.numpy_function(bbox_tools.bbox_reg2truebox, [base_boxes, regs], tf.int32)
-        return  truebox
+        truebox = tf.numpy_function(bbox_tools.bbox_reg2truebox, [base_boxes, regs], tf.float32)
+        return truebox
 
     @classmethod
     def xxyy2xywh(cls, boxes):
@@ -61,9 +70,9 @@ class bbox_tools_tf:
         return boxes2
 
 
-if __name__=='__main__':
-    t1 = tf.constant([[10,10,20,20]], dtype=tf.int32)
-    t2 = tf.constant([[5,5, 35, 35]])
+if __name__ == '__main__':
+    t1 = tf.constant([[10, 10, 20, 20]], dtype=tf.int32)
+    t2 = tf.constant([[5, 5, 35, 35]])
     print(t1)
     print(bbox_tools_tf.xxyy2xywh(t1))
     print(bbox_tools_tf.xywh2xxyy(bbox_tools_tf.xxyy2xywh(t1)))
@@ -71,3 +80,4 @@ if __name__=='__main__':
     print(bbox_tools_tf.xxyy2xywh(t2))
     print(bbox_tools_tf.bbox_regression_target(t1, t2))
     print(bbox_tools_tf.bbox_reg2truebox(t1, bbox_tools_tf.bbox_regression_target(t1, t2)))
+    print(bbox_tools_tf.ious(t1, t2[0]))
