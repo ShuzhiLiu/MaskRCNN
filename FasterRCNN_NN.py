@@ -41,16 +41,9 @@ class FasterRCNN():
                                                                 n_stage=Param.N_STAGE)
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
 
-        # === FasterRCNN ===
-        # self.proposed_boxes = self._proposal_boxes(self.RPN_model.outputs[0], self.RPN_model.outputs[1],
-        #                                            self.anchor_candidates)
-        # self.RoI_head_out = self.RoI_header([self.backbone_model.outputs, self.proposed_boxes])
-        # self.FasterRCNN_model = tf.keras.Model(inputs=[self.backbone_model.inputs],
-        #                                        outputs=[self.RoI_head_out])
-        # tf.keras.utils.plot_model(model=self.FasterRCNN_model, to_file='FasterRCNN_NN.png', show_shapes=True)
 
     def test_loss_function(self):
-        inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data_RPN()
+        inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data_RPN_all()
         print(inputs.shape, anchor_targets.shape, bbox_targets.shape)
         input1 = np.reshape(inputs[0, :, :, :], (1, 720, 1280, 3))
         anchor1 = np.reshape(anchor_targets[0, :, :, :], (1, 23, 40, 9))
@@ -98,7 +91,7 @@ class FasterRCNN():
         return np.array(final_box).astype(np.float)
         # return final_box
 
-    def FasterRCNN(self):
+    def FasterRCNN_output(self):
         inputs, anchor_targets, bbox_reg_targets = self.get_train_data_RPN(True)
         print(inputs.shape, anchor_targets.shape, bbox_reg_targets.shape)
         image = np.reshape(inputs[0, :, :, :], (1, 720, 1280, 3))
@@ -218,7 +211,7 @@ class FasterRCNN():
 
     def test_total_visualization(self):
         # === prediction part ===
-        input_images, target_anchor_bboxes, target_classes = self.train_data_generator._gen_train_data_RoI_one(
+        input_images, target_anchor_bboxes, target_classes = self.train_data_generator.gen_train_data_RoI_one(
             self.train_data_generator.dataset_coco.image_ids[0])
         input_images, target_anchor_bboxes, target_classes = np.asarray(input_images).astype(np.float), np.asarray(
             target_anchor_bboxes), np.asarray(target_classes)
@@ -274,30 +267,19 @@ class FasterRCNN():
             print(f'epoch : {epoch}')
             for i in range(n_sample):
                 # print(f'{i} th image')
-                self.RPN.train_step(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
+                self.RPN.train_step_with_backbone(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
 
     def get_train_data_RPN(self, load_data=False):
         if load_data and os.path.isfile(f'train_data_RPN_temp{Param.DATASET_ID}.pkl'):
             with open(f'train_data_RPN_temp{Param.DATASET_ID}.pkl', 'rb') as f:
                 inputs, anchor_targets, bbox_reg_targets = pickle.load(f)
         else:
-            inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN()
+            inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN_all()
             with open(f'train_data_RPN_temp{Param.DATASET_ID}.pkl', 'wb') as f:
                 pickle.dump([inputs, anchor_targets, bbox_reg_targets], f, protocol=4)
         return inputs, anchor_targets, bbox_reg_targets
 
-    def train_RoI(self):
-        for _ in range(100):
-            x, y = self.train_data_generator.gen_train_data_RoI_generator()
-            self.RoI.train_step_with_backbone(x[0][:2], x[1][:2], y[0][:2], y[1][:2])
-            print('trained one step')
-            # self.RoI_train_model.fit(x=x,
-            #                          y=y,
-            #                          batch_size=4,
-            #                          epochs=1)
-        # TODO: complete the generator below
-        # generator = RoI_generator(self.train_data_generator)
-        # self.RoI_train_model.fit_generator(generator, steps_per_epoch=25, epochs=1,max_queue_size=0,use_multiprocessing=False)
+
 
     def train_RPN_RoI(self, load_data=False):
         inputs, anchor_targets, bbox_reg_targets = self.get_train_data_RPN(load_data)
@@ -308,8 +290,10 @@ class FasterRCNN():
             print(f'epoch : {epoch}')
             for i in range(n_sample):
                 # print(f'{i} th image')
-                self.RPN.train_step(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
-                input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator._gen_train_data_RoI_one(
+                # --- train RPN ---
+                self.RPN.train_step_with_backbone(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
+                # --- train RoI ---
+                input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
                     image_ids[i])
                 input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = np.asarray(input_img).astype(
                     np.float), np.asarray(input_box_fromAnchorBox), np.asarray(target_class), np.asarray(
@@ -342,11 +326,11 @@ if __name__ == '__main__':
     # print(t1, t2)
     # f1.test_proposal_visualization()
     # f1.train_RPN(load_data=True)
-    # f1.train_RPN_RoI(load_data=True)
-    # f1.save_weight()
+    f1.train_RPN_RoI(load_data=False)
+    f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
-    f1.FasterRCNN()
+    f1.FasterRCNN_output()
     # f1.test_RoI_visualization()
     # f1.train_RoI()
     # f1.test_RoI_visualization()
