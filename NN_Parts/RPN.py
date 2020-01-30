@@ -58,7 +58,8 @@ class RPN:
         # self._RPN_train_model()
 
         # --- for low level training ---
-        self.optimizer = tf.keras.optimizers.Adam(self.lr)
+        self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
+        self.optimizer_header = tf.keras.optimizers.Adam(self.lr)
 
     def _RPN_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
@@ -136,13 +137,20 @@ class RPN:
 
     @tf.function
     def train_step_with_backbone(self, image, anchor_target, box_reg_target):
-        with tf.GradientTape() as backbone_tape, tf.GradientTape() as header_tape:
+        with tf.GradientTape() as backbone_tape:
             anchor_pred, box_reg_pred = self.RPN_with_backbone_model(image)
             total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
         gradients_backbone = backbone_tape.gradient(total_loss, self.RPN_with_backbone_model.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients_backbone, self.RPN_with_backbone_model.trainable_variables))
+        self.optimizer_with_backbone.apply_gradients(zip(gradients_backbone, self.RPN_with_backbone_model.trainable_variables))
+
+    @tf.function
+    def train_step_header(self, image, anchor_target, box_reg_target):
+        with tf.GradientTape() as header_tape:
+            anchor_pred, box_reg_pred = self.RPN_with_backbone_model(image)
+            total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
         gradients_header = header_tape.gradient(total_loss, self.RPN_header_model.trainable_variables)
-        self.optimizer.apply_gradients(zip(gradients_header, self.RPN_header_model.trainable_variables))
+        self.optimizer_header.apply_gradients(zip(gradients_header, self.RPN_header_model.trainable_variables))
+
 
 
 

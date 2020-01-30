@@ -104,6 +104,11 @@ class FasterRCNN():
         print(np.max(proposed_boxes), np.max(pred_box_reg))
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=proposed_boxes, regs=pred_box_reg)
         final_box = bbox_tools.clip_boxes(final_box, self.IMG_SHAPE)
+        # get top k element
+        k = 20
+        pred_class_value = np.max(pred_class, axis=1)
+        indices_top = np.argpartition(a=pred_class_value, kth=-k)[-k:]
+        final_box = final_box[indices_top]
         self.cocotool.DrawBboxes(Original_Image=image[0], Bboxes=final_box.tolist(), show=True, savefile=True,
                                  path=Param.PATH_DEBUG_IMG, savename='5PredNMSBoxes')
 
@@ -282,25 +287,51 @@ class FasterRCNN():
 
 
     def train_RPN_RoI(self, load_data=False):
-        inputs, anchor_targets, bbox_reg_targets = self.get_train_data_RPN(load_data)
-        # print(f"box reg target shape: {bbox_reg_targets.shape}")
-        n_sample = inputs.shape[0]
+        # inputs, anchor_targets, bbox_reg_targets = self.get_train_data_RPN(load_data)
+        # # print(f"box reg target shape: {bbox_reg_targets.shape}")
+        # n_sample = inputs.shape[0]
+        # image_ids = self.train_data_generator.dataset_coco.image_ids
+        # for epoch in range(Param.EPOCH):
+        #     print(f'epoch : {epoch}')
+        #     for i in range(n_sample):
+        #         # print(f'{i} th image')
+        #         # --- train RPN ---
+        #         self.RPN.train_step_with_backbone(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
+        #         # --- train RoI ---
+        #         input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
+        #             image_ids[i])
+        #         input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = np.asarray(input_img).astype(
+        #             np.float), np.asarray(input_box_fromAnchorBox), np.asarray(target_class), np.asarray(
+        #             target_bbox_reg)
+        #         n_box = input_img.shape[0]
+        #         for j in range(n_box):
+        #             self.RoI.train_step_no_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
+        #                                             target_class[j:j + 1], target_bbox_reg[j:j + 1])
+        #         j = random.randint(a=0,
+        #                            b=n_box - 1)  # model with backbone only be trained once to balance RPN and RoI training
+        #         self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
+        #                                           target_class[j:j + 1], target_bbox_reg[j:j + 1])
         image_ids = self.train_data_generator.dataset_coco.image_ids
         for epoch in range(Param.EPOCH):
             print(f'epoch : {epoch}')
-            for i in range(n_sample):
+            temp_image_ids = random.choices(population=image_ids,weights=None,k=10)
+            for image_id in temp_image_ids:
+                inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN_one(image_id)
+                self.RPN.train_step_header(inputs, anchor_targets, bbox_reg_targets)
+            for image_id in image_ids:
                 # print(f'{i} th image')
-                # --- train RPN ---
-                self.RPN.train_step_with_backbone(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
+                # --- train RPN with backbone---
+                inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN_one(image_id)
+                self.RPN.train_step_with_backbone(inputs, anchor_targets, bbox_reg_targets)
                 # --- train RoI ---
                 input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
-                    image_ids[i])
+                    image_id)
                 input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = np.asarray(input_img).astype(
                     np.float), np.asarray(input_box_fromAnchorBox), np.asarray(target_class), np.asarray(
                     target_bbox_reg)
                 n_box = input_img.shape[0]
                 for j in range(n_box):
-                    self.RoI.train_step_no_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
+                    self.RoI.train_step_header(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
                                                     target_class[j:j + 1], target_bbox_reg[j:j + 1])
                 j = random.randint(a=0,
                                    b=n_box - 1)  # model with backbone only be trained once to balance RPN and RoI training
