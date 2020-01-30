@@ -11,9 +11,9 @@ from tensorflow.keras.utils import Sequence
 
 
 class NN_data_generator():
-    def __init__(self, file, imagefolder_path, img_shape=(720,1280), n_stage=5):
+    def __init__(self, file, imagefolder_path, img_shape_resize=(720, 1280), img_shape_ori=(720,1280), n_stage=5):
         self.dataset_coco = coco_tools(file, imagefolder_path)
-        self.anchor_generator = gen_candidate_anchors(img_shape=img_shape, n_stage=n_stage)
+        self.anchor_generator = gen_candidate_anchors(img_shape=img_shape_resize, n_stage=n_stage)
 
     def gen_train_target_anchor_boxreg(self, image_id, debuginfo=False):
         bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
@@ -131,7 +131,7 @@ class NN_data_generator():
                 target_classes.append(SparseTargets[index])
         return target_anchor_bboxes, target_classes
 
-    def _gen_train_data_RoI_one(self,image_id):
+    def gen_train_data_RoI_one(self, image_id):
         gt_bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
         SparseTargets = self.dataset_coco.GetOriginalCategorySparseList(image_id=image_id)
 
@@ -146,12 +146,12 @@ class NN_data_generator():
             bboxes_ious.append(ious_temp)
 
         # for each gt_box, determine the box reg target
-        original_img = self.gen_train_input(image_id)
+        original_img = self.gen_train_input_one(image_id)
         input_images = []
         input_box_fromAnchorBox = []
         target_classes = []
         target_bbox_reg = []
-        for index, bbox_ious in enumerate(bboxes_ious):
+        for index_gt, bbox_ious in enumerate(bboxes_ious):
             ious_temp = np.reshape(bbox_ious, newshape=(self.anchor_generator.h,
                                                         self.anchor_generator.w,
                                                         self.anchor_generator.n_anchors))
@@ -159,58 +159,40 @@ class NN_data_generator():
             n = candidate_boxes.shape[0]
             for i in range(n):
                 input_box_fromAnchorBox.append(candidate_boxes[i].astype(np.float))
-                box_reg = bbox_tools.bbox_regression_target(pred_boxes=candidate_boxes[i].reshape((1,4)), gt_box=gt_bboxes[index])
+                box_reg = bbox_tools.bbox_regression_target(pred_boxes=candidate_boxes[i].reshape((1,4)), gt_box=gt_bboxes[index_gt])
                 target_bbox_reg.append(box_reg.ravel())
-                target_classes.append(SparseTargets[index])
+                target_classes.append(SparseTargets[index_gt])
                 input_images.append(original_img.astype(np.float))
+        for index_gt, bbox_gt in enumerate(gt_bboxes):
+            input_images.append(original_img.astype(np.float))
+            input_box_fromAnchorBox.append(bbox_gt.astype(np.float))
+            target_classes.append(SparseTargets[index_gt])
+            target_bbox_reg.append(np.array([0,0,0,0], dtype=np.float))
         return input_images ,input_box_fromAnchorBox, target_classes, target_bbox_reg
 
-    def gen_train_data_RoI_generator(self):
-        # abandoned already, find a time to clean this part
-        input_images, target_anchor_bboxes, target_classes, bbox_reg_targets = [], [], [], []
-        n_len = 80
-        while len(input_images) < n_len:
-            image_id = random.choice(self.dataset_coco.image_ids)
-            input_img, tar_an_b, tar_cls, bbox_reg_target_RoI = self._gen_train_data_RoI_one(image_id)
-            input_images += input_img
-            target_anchor_bboxes += tar_an_b
-            target_classes += tar_cls
-            anchor_target, bbox_reg_target = self.gen_train_target_anchor_boxreg(image_id)
-            bbox_reg_target = bbox_reg_target[anchor_target>0]
-            bbox_reg_targets += bbox_reg_target.tolist()
-        input_images, target_anchor_bboxes, target_classes, bbox_reg_targets =input_images[:n_len], target_anchor_bboxes[:n_len], target_classes[:n_len], bbox_reg_targets[:n_len]
-        input_images = np.asarray(input_images).astype(np.float)
-        target_anchor_bboxes = np.asarray(target_anchor_bboxes).astype(np.float)
-        target_classes = np.asarray(target_classes).astype(np.float)
-        bbox_reg_targets = np.asarray(bbox_reg_targets).astype(np.float)
-        print(input_images.shape, target_anchor_bboxes.shape,target_classes.shape, bbox_reg_targets.shape)
-        return ([input_images, target_anchor_bboxes], [target_classes, bbox_reg_targets])
-
-    def gen_train_data_RoI(self):
-        input_images, target_anchor_bboxes, target_classes = [],[],[]
-        for image_id in self.dataset_coco.image_ids:
-            input_img, tar_an_b, tar_cls = self._gen_train_data_RoI_one(image_id)
-            input_images += input_img
-            target_anchor_bboxes += tar_an_b
-            target_classes += tar_cls
-        return np.array(input_images), np.array(target_anchor_bboxes), np.array(target_classes)
 
 
 
-    def gen_train_input(self, image_id):
+    def gen_train_input_one(self, image_id):
         return self.dataset_coco.GetOriginalImage(image_id=image_id)
 
 
-    def gen_train_data_RPN(self):
+    def gen_train_data_RPN_all(self):
         inputs = []
         anchor_targets = []
         bbox_reg_targets = []
         for image_id in self.dataset_coco.image_ids:
-            inputs.append(self.gen_train_input(image_id))
+            inputs.append(self.gen_train_input_one(image_id))
             anchor_target, bbox_reg_target = self.gen_train_target_anchor_boxreg(image_id)
             anchor_targets.append(anchor_target)
             bbox_reg_targets.append(bbox_reg_target)
         return np.array(inputs).astype(np.float), np.array(anchor_targets), np.array(bbox_reg_targets)
+
+    def gen_train_data_RPN_one(self, image_id):
+        input1 = self.gen_train_input_one(image_id)
+        anchor_target, bbox_reg_target = self.gen_train_target_anchor_boxreg(image_id)
+        return np.array([input1]).astype(np.float), np.array([anchor_target]).astype(np.float), np.array([bbox_reg_target]).astype(np.float)
+
 
 
     def _validate_bbox(self,image_id, bboxes):
@@ -234,17 +216,6 @@ class NN_data_generator():
         plt.imshow(img1, cmap='gray')
         plt.show()
 
-class RoI_generator(Sequence):
-
-    def __init__(self,data_generator:NN_data_generator):
-        self.generator = data_generator
-        self.batch_size = 4
-
-    def __len__(self):
-        return int(np.ceil(100 / float(self.batch_size)))
-
-    def __getitem__(self, idx):
-        return self.generator.gen_train_data_RoI_generator()
 
 
 

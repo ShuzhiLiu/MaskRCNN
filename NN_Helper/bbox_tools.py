@@ -46,7 +46,7 @@ class bbox_tools:
 
         # The purpose of these procedure is to make sure target label in [-1,1] !!!
         # This can be achieved only when the iou>0.7, in the case the biggest iou is still small
-        # the value will be out of [-1,1]
+        # the value will be out of [-1,1], and when the boxes is same, the reg will be [0,0,0,0]
         reg_target[:, 0] = (gt_boxes_xywh[:, 0] - ex_boxes_xywh[:, 0]) / ex_boxes_xywh[:, 2]
         reg_target[:, 1] = (gt_boxes_xywh[:, 1] - ex_boxes_xywh[:, 1]) / ex_boxes_xywh[:, 3]
         reg_target[:, 2] = np.log(gt_boxes_xywh[:, 2] / ex_boxes_xywh[:, 2])
