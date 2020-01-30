@@ -47,10 +47,15 @@ def Backbone_test():
 
 
 class Backbone:
-    def __init__(self, IMG_SHAPE=(720, 1280, 3)):
+    def __init__(self, IMG_SHAPE=(720, 1280, 3), n_stage=5):
         # the stages of other implementation is 4, note that this ResNet50V2 has 5!
-        self.backbone_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
+        self.base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
                                                            include_top=False)
+        if n_stage==4:
+            self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[
+                self.base_model.get_layer(name='conv4_block6_preact_relu').output])
+        elif n_stage==5:
+            self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[self.base_model.output])
         # conv1 = tf.keras.layers.Conv2D(filters=256, kernel_size=(1, 1), padding='same')(self.base_model.output)
         # bh1 = tf.keras.layers.BatchNormalization()(conv1)
         # ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(bh1)
