@@ -11,6 +11,7 @@ class RPN:
         self.BATCH = batch
         self.lr = lr
         # the part of backbone
+        self.backbone_model = backbone_model
         back_outshape = backbone_model.output.shape[1:]
 
         self.input_RPN = tf.keras.Input(shape=back_outshape,batch_size=None, name='RPN_INPUT', dtype=tf.float32)
@@ -55,7 +56,7 @@ class RPN:
         # tf.keras.utils.plot_model(model=self.RPN_header_model, to_file='RPN_header_model.png', show_shapes=True)
         tf.keras.utils.plot_model(model=self.RPN_with_backbone_model, to_file='RPN_with_backbone.png', show_shapes=True)
 
-        # self._RPN_train_model()
+        self._RPN_train_model()
 
         # --- for low level training ---
         self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
@@ -72,8 +73,8 @@ class RPN:
                                               name='RPN_train_model')
         self.RPN_train_model.add_loss(losses=self._RPN_loss(anchor_target=self.RPN_Anchor_Target,
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
-                                                            anchor_pred=self.RPN_Anchor_Pred,
-                                                            bbox_reg_pred=self.RPN_BBOX_Regression_Pred))
+                                                            anchor_pred=self.RPN_with_backbone_model.outputs[0],
+                                                            bbox_reg_pred=self.RPN_with_backbone_model.outputs[1])) # Always check if the layers are in current graph!
         self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr))
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
