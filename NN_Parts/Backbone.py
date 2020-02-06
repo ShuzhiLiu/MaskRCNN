@@ -51,11 +51,12 @@ class Backbone:
         # the stages of other implementation is 4, note that this ResNet50V2 has 5!
         self.base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
                                                            include_top=False)
-        if n_stage==4:
+        if n_stage == 4:
             self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[
-                self.base_model.get_layer(name='conv4_block6_preact_relu').output])
-        elif n_stage==5:
-            self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[self.base_model.output])
+                self.base_model.get_layer(name='conv4_block6_preact_relu').output], name='BACKBONE_MODEL')
+        elif n_stage == 5:
+            self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[self.base_model.output],
+                                                 name='BACKBONE_MODEL')
         # conv1 = tf.keras.layers.Conv2D(filters=256, kernel_size=(1, 1), padding='same')(self.base_model.output)
         # bh1 = tf.keras.layers.BatchNormalization()(conv1)
         # ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(bh1)

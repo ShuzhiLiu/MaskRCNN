@@ -8,13 +8,15 @@ class RoI:
     def __init__(self, backbone_model, IMG_SHAPE, lr=1e-4, n_stage=5):
         self.backbone_model = backbone_model
         self.lr = lr
+        self.input_bockbone = tf.keras.Input(shape=backbone_model.input.shape[1:], dtype=tf.float32,
+                                             name='BACKBONE_INPUT')
         proposal_boxes = tf.keras.Input(shape=(4,), batch_size=None, name='PROPOSAL_BOXES', dtype=tf.float32)
         feature_map_shape = self.backbone_model.layers[-1].output_shape[1:]
         feature_map = tf.keras.Input(shape=feature_map_shape, batch_size=None, name='FEATURE_MAP', dtype=tf.float32)
 
         shape1 = tf.shape(proposal_boxes)
         n_boxes = tf.gather_nd(shape1, [0])
-        indices = tf.zeros(shape=n_boxes, dtype=tf.int32)   # only input 1 image, all indices are 0
+        indices = tf.zeros(shape=n_boxes, dtype=tf.int32)  # only input 1 image, all indices are 0
         img_shape_constant = tf.constant([IMG_SHAPE[0], IMG_SHAPE[1], IMG_SHAPE[0], IMG_SHAPE[1]], tf.float32)
         proposal_boxes2 = tf.math.divide(proposal_boxes, img_shape_constant)
 
@@ -25,9 +27,11 @@ class RoI:
         box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc1)
 
         self.RoI_header_model = tf.keras.Model(inputs=[feature_map, proposal_boxes],
-                                               outputs=[class_header, box_reg_header])
-        RoI_with_backbone_out1,RoI_with_backbone_out2 = self.RoI_header_model([self.backbone_model.output, proposal_boxes])
-        self.RoI_with_backbone_model = tf.keras.Model(inputs=[self.backbone_model.input, proposal_boxes],
+                                               outputs=[class_header, box_reg_header],
+                                               name='RoI_HEADER_MODEL')
+        backbone_out = self.backbone_model(self.input_bockbone)
+        RoI_with_backbone_out1, RoI_with_backbone_out2 = self.RoI_header_model([backbone_out, proposal_boxes])
+        self.RoI_with_backbone_model = tf.keras.Model(inputs=[self.input_bockbone, proposal_boxes],
                                                       outputs=[RoI_with_backbone_out1, RoI_with_backbone_out2])
         tf.keras.utils.plot_model(self.RoI_header_model, 'RoI_header_model.png', show_shapes=True)
         tf.keras.utils.plot_model(self.RoI_with_backbone_model, 'RoI_with_backbone_model.png', show_shapes=True)

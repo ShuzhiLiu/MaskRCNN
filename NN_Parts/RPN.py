@@ -13,8 +13,10 @@ class RPN:
         # the part of backbone
         self.backbone_model = backbone_model
         back_outshape = backbone_model.output.shape[1:]
+        self.input_backbone = tf.keras.Input(shape=backbone_model.input.shape[1:], name='BACKBONE_INPUT',
+                                             dtype=tf.float32)
 
-        self.input_RPN = tf.keras.Input(shape=back_outshape,batch_size=None, name='RPN_INPUT', dtype=tf.float32)
+        self.input_RPN = tf.keras.Input(shape=back_outshape, batch_size=None, name='RPN_INPUT', dtype=tf.float32)
         self.conv1 = tf.keras.layers.Conv2D(filters=512, kernel_size=(3, 3), padding='same',
                                             kernel_initializer='he_normal', name='RPN_START')(
             self.input_RPN)
@@ -40,12 +42,14 @@ class RPN:
             target_shape=(back_outshape[0], back_outshape[1], int(36 / 4), 4), name='RPN_BBOX_Regression_Pred')(
             self.ac3)
 
-        self.RPN_header_model = tf.keras.Model(inputs=[self.input_RPN],outputs=[self.RPN_Anchor_Pred, self.RPN_BBOX_Regression_Pred])
-        RPN_Anchor_Pred, RPN_BBOX_Regression_Pred = self.RPN_header_model([backbone_model.output])
-        self.RPN_with_backbone_model = tf.keras.Model(inputs=[backbone_model.inputs],
+        self.RPN_header_model = tf.keras.Model(inputs=[self.input_RPN],
+                                               outputs=[self.RPN_Anchor_Pred, self.RPN_BBOX_Regression_Pred],
+                                               name='RPN_HEADER_MODEL')
+        backbone_out = backbone_model(self.input_backbone)
+        RPN_Anchor_Pred, RPN_BBOX_Regression_Pred = self.RPN_header_model(backbone_out)
+        self.RPN_with_backbone_model = tf.keras.Model(inputs=[self.input_backbone],
                                                       outputs=[RPN_Anchor_Pred, RPN_BBOX_Regression_Pred],
                                                       name='RPN_BACKBONE_MODEL')
-
 
         self.shape_Anchor_Target = self.RPN_header_model.get_layer(
             name='tf_op_layer_RPN_Anchor_Pred').output.shape[1:-1]
@@ -74,7 +78,8 @@ class RPN:
         self.RPN_train_model.add_loss(losses=self._RPN_loss(anchor_target=self.RPN_Anchor_Target,
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
                                                             anchor_pred=self.RPN_with_backbone_model.outputs[0],
-                                                            bbox_reg_pred=self.RPN_with_backbone_model.outputs[1])) # Always check if the layers are in current graph!
+                                                            bbox_reg_pred=self.RPN_with_backbone_model.outputs[
+                                                                1]))  # Always check if the layers are in current graph!
         self.RPN_train_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.lr))
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
@@ -142,7 +147,8 @@ class RPN:
             anchor_pred, box_reg_pred = self.RPN_with_backbone_model(image)
             total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
         gradients_backbone = backbone_tape.gradient(total_loss, self.RPN_with_backbone_model.trainable_variables)
-        self.optimizer_with_backbone.apply_gradients(zip(gradients_backbone, self.RPN_with_backbone_model.trainable_variables))
+        self.optimizer_with_backbone.apply_gradients(
+            zip(gradients_backbone, self.RPN_with_backbone_model.trainable_variables))
 
     @tf.function
     def train_step_header(self, image, anchor_target, box_reg_target):
@@ -151,8 +157,6 @@ class RPN:
             total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
         gradients_header = header_tape.gradient(total_loss, self.RPN_header_model.trainable_variables)
         self.optimizer_header.apply_gradients(zip(gradients_header, self.RPN_header_model.trainable_variables))
-
-
 
 
 if __name__ == '__main__':
