@@ -12,7 +12,7 @@ DATASET_ID = '1945415016934'
 with open(f"{BASE_PATH}/{DATASET_ID}/annotations/train.json", 'r') as f:
     train_coco = json.load(f)
 
-data1 = coco_tools(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
+data1 = coco_tools(jsonfile=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
                    imagefolder_path='/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images')
 img1 = data1.GetOriginalImage(image_id="20191119T063434-f7b72bed-b7ad-48c8-870a-7b4eaad23474")
 print(data1.images)

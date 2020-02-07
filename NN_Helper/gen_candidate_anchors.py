@@ -7,15 +7,23 @@ from Debugger import DebugPrint
 
 
 class gen_candidate_anchors:
-    def __init__(self, img_shape=(720, 1280), n_stage=5):
+    def __init__(self,
+                 base_size=16,
+                 ratios=None,
+                 scales=2 ** np.arange(3, 6),
+                 img_shape=(720, 1280),
+                 n_stage=5,
+                 n_anchors=9):
+        if ratios is None:
+            ratios = [0.5, 1, 2]
         self.img_shape = img_shape
         self.n_stage_revert_factor = 2 ** n_stage
-        self.base_anchors = gen_base_anchors.gen_base_anchors(base_size=16, ratios=[0.5, 1, 2],
-                                                              scales=2 ** np.arange(3, 6))
+        self.base_anchors = gen_base_anchors.gen_base_anchors(base_size=base_size, ratios=ratios,
+                                                              scales=scales)
         # here round up the number since the tensorflow conv2d round strategy
         self.h = int(img_shape[0] / self.n_stage_revert_factor) + int((img_shape[0] % self.n_stage_revert_factor) > 0)
         self.w = int(img_shape[1] / self.n_stage_revert_factor) + int((img_shape[1] % self.n_stage_revert_factor) > 0)
-        self.n_anchors = 9
+        self.n_anchors = n_anchors
         self.anchor_candidates = self.gen_all_candidate_anchors(self.h, self.w, self.n_anchors, img_shape)
         self.anchor_candidates_list = list(np.reshape(self.anchor_candidates, newshape=(-1, 4)).tolist())
 
@@ -65,7 +73,7 @@ if __name__ == '__main__':
     DebugPrint("9 Anchors candidate at [10,10]", t1.anchor_candidates[10, 10, :, :])
     # bboxes = [t1.anchors_candidate[10, 10, i, :] for i in range(9)]
     bboxes = t1.anchor_candidates[13, 22, :, :].tolist()
-    t1._validate_bbox([bboxes[6]])
+    t1._validate_bbox(bboxes)
     # print(t1.all_anchors[23,40,:,:])
     DebugPrint("1 Anchor candidate at [0,0,2]", t1.anchor_candidates[0, 0, 2, :])
     # temp = t1.anchors_candidate.reshape((-1, 4))

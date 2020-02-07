@@ -14,7 +14,7 @@ class RoI:
         feature_map_shape = self.backbone_model.layers[-1].output_shape[1:]
         feature_map = tf.keras.Input(shape=feature_map_shape, batch_size=None, name='FEATURE_MAP', dtype=tf.float32)
 
-        shape1 = tf.shape(proposal_boxes)
+        shape1 = tf.shape(proposal_boxes, out_type=tf.int32)
         n_boxes = tf.gather_nd(shape1, [0])
         indices = tf.zeros(shape=n_boxes, dtype=tf.int32)  # only input 1 image, all indices are 0
         img_shape_constant = tf.constant([IMG_SHAPE[0], IMG_SHAPE[1], IMG_SHAPE[0], IMG_SHAPE[1]], tf.float32)

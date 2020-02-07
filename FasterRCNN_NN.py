@@ -15,7 +15,7 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'  # for mac os tensorflow setting
 # tf.keras.backend.set_floatx('float64')
 
 class FasterRCNN():
-    def __init__(self, IMG_SHAPE=Param.IMG_SHAPE):
+    def __init__(self, IMG_SHAPE=Param.IMG_SHAPE_ORIGINAL):
         b1 = Backbone(IMG_SHAPE=IMG_SHAPE)
         self.IMG_SHAPE = IMG_SHAPE
         self.backbone_model = b1.backbone_model
@@ -29,18 +29,27 @@ class FasterRCNN():
         self.RoI_with_backbone_model = self.RoI.RoI_with_backbone_model
         self.RoI_header = self.RoI.RoI_header_model
 
-
-
         # === Data part ===
         self.train_data_generator = NN_data_generator(
             file=f"{Param.PATH_DATA}/{Param.DATASET_ID}/annotations/train.json",
-            imagefolder_path=Param.PATH_IMAGES)
+            imagefolder_path=Param.PATH_IMAGES,
+            base_size=Param.BASE_SIZE,
+            ratios=Param.RATIOS,
+            scales=Param.SCALES,
+            n_anchors=Param.N_ANCHORS,
+            img_shape_resize=(720, 1280),
+            img_shape_ori=(720, 1280),
+            n_stage=Param.N_STAGE,
+            threshold_iou_rpn=Param.THRESHOLD_IOU_RPN,
+            threshold_iou_roi=Param.THRESHOLD_IOU_RoI)
         self.cocotool = self.train_data_generator.dataset_coco
 
-        self.anchor_candidate_generator = gen_candidate_anchors(img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]),
-                                                                n_stage=Param.N_STAGE)
+        self.anchor_candidate_generator = gen_candidate_anchors(base_size=Param.BASE_SIZE,
+                                                                scales=Param.SCALES,
+                                                                img_shape=(IMG_SHAPE[0], IMG_SHAPE[1]),
+                                                                n_stage=Param.N_STAGE,
+                                                                n_anchors=Param.N_ANCHORS)
         self.anchor_candidates = self.anchor_candidate_generator.anchor_candidates
-
 
     def test_loss_function(self):
         inputs, anchor_targets, bbox_targets = self.train_data_generator.gen_train_data_RPN_all()
@@ -58,7 +67,11 @@ class FasterRCNN():
     def _proposal_boxes(self, RPN_Anchor_Pred, RPN_BBOX_Regression_Pred, anchor_candidates):
         # === Selection part ===
         # top_values, top_indices = tf.math.top_k()
-        RPN_Anchor_Pred = tf.slice(RPN_Anchor_Pred, [0, 0, 0, 0, 1], [1, 23, 40, 9, 1])  # second channel is foreground
+        RPN_Anchor_Pred = tf.slice(RPN_Anchor_Pred, [0, 0, 0, 0, 1], [1,
+                                                                      self.anchor_candidate_generator.h,
+                                                                      self.anchor_candidate_generator.w,
+                                                                      self.anchor_candidate_generator.n_anchors,
+                                                                      1])  # second channel is foreground
         # squeeze the pred of anchor and bbox_reg
         RPN_Anchor_Pred = tf.squeeze(RPN_Anchor_Pred)
         RPN_BBOX_Regression_Pred = tf.squeeze(RPN_BBOX_Regression_Pred)
@@ -99,18 +112,18 @@ class FasterRCNN():
         proposed_boxes = self._proposal_boxes(RPN_Anchor_Pred, RPN_BBOX_Regression_Pred,
                                               self.anchor_candidates)
         pred_class, pred_box_reg = self.RoI_with_backbone_model([image, proposed_boxes])
-        print(pred_class,pred_box_reg)
+        print(pred_class, pred_box_reg)
         print(proposed_boxes)
         print(np.max(proposed_boxes), np.max(pred_box_reg))
         final_box = bbox_tools.bbox_reg2truebox(base_boxes=proposed_boxes, regs=pred_box_reg)
         final_box = bbox_tools.clip_boxes(final_box, self.IMG_SHAPE)
         # get top k element
-        k = 20
-        pred_class_value = np.max(pred_class, axis=1)
-        indices_top = np.argpartition(a=pred_class_value, kth=-k)[-k:]
-        final_box = final_box[indices_top]
+        # k = 300
+        # pred_class_value = np.max(pred_class, axis=1)
+        # indices_top = np.argpartition(a=pred_class_value, kth=-k)[-k:]
+        # final_box = final_box[indices_top]
         self.cocotool.DrawBboxes(Original_Image=image[0], Bboxes=final_box.tolist(), show=True, savefile=True,
-                                 path=Param.PATH_DEBUG_IMG, savename='5PredNMSBoxes')
+                                 path=Param.PATH_DEBUG_IMG, savename='6PredRoISBoxes')
 
         # === Non maximum suppression ===
         final_box_temp = np.array(final_box).astype(np.int)
@@ -122,7 +135,7 @@ class FasterRCNN():
             final_box_temp = final_box_temp[ious < Param.RPN_NMS_THRESHOLD]
         DebugPrint('number of box after nms', len(nms_boxes_list))
         self.cocotool.DrawBboxes(Original_Image=image[0], Bboxes=nms_boxes_list, show=True, savefile=True,
-                                 path=Param.PATH_DEBUG_IMG, savename='5PredNMSBoxes')
+                                 path=Param.PATH_DEBUG_IMG, savename='7PredRoINMSBoxes')
 
     def test_proposal_visualization(self):
         # === Prediction part ===
@@ -203,7 +216,7 @@ class FasterRCNN():
         original_boxes = self.cocotool.GetOriginalBboxesList(image_id=self.cocotool.image_ids[0])
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=original_boxes, show=True, savefile=True,
                                  path=Param.PATH_DEBUG_IMG, savename='1GroundTruthBoxes')
-        target_anchor_boxes, target_classes = self.train_data_generator.gen_target_anchor_bboxes_classes(
+        target_anchor_boxes, target_classes = self.train_data_generator.gen_target_anchor_bboxes_classes_for_Debug(
             image_id=self.cocotool.image_ids[0])
         self.cocotool.DrawBboxes(Original_Image=input1[0], Bboxes=target_anchor_boxes, show=True, savefile=True,
                                  path=Param.PATH_DEBUG_IMG, savename='2TrueAnchorBoxes')
@@ -217,7 +230,8 @@ class FasterRCNN():
     def test_total_visualization(self):
         # === prediction part ===
         input_images, target_anchor_bboxes, target_classes = self.train_data_generator.gen_train_data_RoI_one(
-            self.train_data_generator.dataset_coco.image_ids[0])
+            self.train_data_generator.dataset_coco.image_ids[0],
+            self.train_data_generator.anchor_generator.anchor_candidates_list)
         input_images, target_anchor_bboxes, target_classes = np.asarray(input_images).astype(np.float), np.asarray(
             target_anchor_bboxes), np.asarray(target_classes)
         # TODO:check tf.image.crop_and_resize
@@ -284,37 +298,13 @@ class FasterRCNN():
                 pickle.dump([inputs, anchor_targets, bbox_reg_targets], f, protocol=4)
         return inputs, anchor_targets, bbox_reg_targets
 
-
-
-    def train_RPN_RoI(self, load_data=False):
-        # inputs, anchor_targets, bbox_reg_targets = self.get_train_data_RPN(load_data)
-        # # print(f"box reg target shape: {bbox_reg_targets.shape}")
-        # n_sample = inputs.shape[0]
-        # image_ids = self.train_data_generator.dataset_coco.image_ids
-        # for epoch in range(Param.EPOCH):
-        #     print(f'epoch : {epoch}')
-        #     for i in range(n_sample):
-        #         # print(f'{i} th image')
-        #         # --- train RPN ---
-        #         self.RPN.train_step_with_backbone(inputs[i:i + 1], anchor_targets[i:i + 1], bbox_reg_targets[i:i + 1])
-        #         # --- train RoI ---
-        #         input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
-        #             image_ids[i])
-        #         input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = np.asarray(input_img).astype(
-        #             np.float), np.asarray(input_box_fromAnchorBox), np.asarray(target_class), np.asarray(
-        #             target_bbox_reg)
-        #         n_box = input_img.shape[0]
-        #         for j in range(n_box):
-        #             self.RoI.train_step_no_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
-        #                                             target_class[j:j + 1], target_bbox_reg[j:j + 1])
-        #         j = random.randint(a=0,
-        #                            b=n_box - 1)  # model with backbone only be trained once to balance RPN and RoI training
-        #         self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
-        #                                           target_class[j:j + 1], target_bbox_reg[j:j + 1])
+    def train_RPN_RoI(self, ):
+        # TODO: use the output of RPN to train RoI
         image_ids = self.train_data_generator.dataset_coco.image_ids
         for epoch in range(Param.EPOCH):
             print(f'epoch : {epoch}')
-            temp_image_ids = random.choices(population=image_ids,weights=None,k=10)
+            temp_image_ids = random.choices(population=image_ids, weights=None, k=5)
+            # --- train RPN header first ---
             for image_id in temp_image_ids:
                 inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN_one(image_id)
                 self.RPN.train_step_header(inputs, anchor_targets, bbox_reg_targets)
@@ -324,19 +314,31 @@ class FasterRCNN():
                 inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_RPN_one(image_id)
                 self.RPN.train_step_with_backbone(inputs, anchor_targets, bbox_reg_targets)
                 # --- train RoI ---
-                input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
-                    image_id)
-                input_img, input_box_fromAnchorBox, target_class, target_bbox_reg = np.asarray(input_img).astype(
-                    np.float), np.asarray(input_box_fromAnchorBox), np.asarray(target_class), np.asarray(
-                    target_bbox_reg)
+                input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
+                    image_id, self.train_data_generator.anchor_generator.anchor_candidates_list)
                 n_box = input_img.shape[0]
+                # --- train RoI header first ---
+                # feature_map = self.backbone_model.predict(input_img[0:1])
+                # feature_map = np.array(feature_map, dtype=np.float)
                 for j in range(n_box):
-                    self.RoI.train_step_header(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
-                                                    target_class[j:j + 1], target_bbox_reg[j:j + 1])
+                    self.RoI.train_step_header(input_img[0:1], input_box_filtered_by_iou[j:j + 1],
+                                               target_class[j:j + 1], target_bbox_reg[j:j + 1])
+                # --- train RoI with backbone once, balance with the RPN train ---
                 j = random.randint(a=0,
                                    b=n_box - 1)  # model with backbone only be trained once to balance RPN and RoI training
-                self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_fromAnchorBox[j:j + 1],
+                self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
                                                   target_class[j:j + 1], target_bbox_reg[j:j + 1])
+
+                # --- train RoI with RPN proposed boxes ---
+                if epoch > 6:
+                    RPN_Anchor_Pred, RPN_BBOX_Regression_Pred = self.RPN_model(input_img[:1])
+                    proposed_boxes = self._proposal_boxes(RPN_Anchor_Pred, RPN_BBOX_Regression_Pred,
+                                                          self.anchor_candidates)
+                    input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_RoI_one(
+                        image_id, proposed_boxes.tolist())
+                    for j in range(n_box):
+                        self.RoI.train_step_header(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
+                                                   target_class[j:j + 1], target_bbox_reg[j:j + 1])
 
     def save_weight(self):
         self.RPN_model.save_weights(filepath=f"{Param.PATH_MODEL}/RPN_model{Param.DATASET_ID}")
@@ -356,9 +358,8 @@ if __name__ == '__main__':
     # t1, t2 = f1.RPN_model.predict(np.array([img1]))
     # print(t1, t2)
     # f1.test_proposal_visualization()
-    # f1.train_RPN(load_data=True)
-    f1.train_RPN_RoI(load_data=False)
-    f1.save_weight()
+    # f1.train_RPN_RoI()
+    # f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
     f1.FasterRCNN_output()

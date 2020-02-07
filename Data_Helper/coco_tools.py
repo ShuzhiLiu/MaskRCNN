@@ -8,8 +8,32 @@ from copy import deepcopy
 
 
 class coco_tools:
-    def __init__(self, file, imagefolder_path):
-        self.LoadAnnoCOCO(file, imagefolder_path)
+    def __init__(self, jsonfile, imagefolder_path):
+        self.LoadAnnoCOCO(jsonfile, imagefolder_path)
+
+    def LoadAnnoCOCO(self, file, imagefolder_path):
+        self.imagefolder_path = imagefolder_path
+        self.file = file
+        with open(file, 'r') as f:
+            dict1 = json.load(f)
+        self.info = dict1["info"]
+        self.licenses = dict1["licenses"]
+        self.images = dict1["images"]
+        self.annotations = dict1["annotations"]
+        self.categories = dict1["categories"]
+        self.segment_info = dict1["segment_info"]
+        self.image_ids = []
+        for image in self.images:
+            if image['id'] not in self.image_ids:
+                self.image_ids.append(image['id'])
+        count = 0
+        self.category2sparse_onehot = {}
+        self.sparse_onehot2category = []
+        for category in self.categories:
+            if category['id'] not in self.category2sparse_onehot:
+                self.category2sparse_onehot[category['id']] = count
+                self.sparse_onehot2category.append(category['id'])
+                count += 1
 
     def DrawSegmFromAnnoCoco(self, image_id, Original_Image, annos, show=False, savefile=False):
         height, width = self.GetImageShape(image_id)
@@ -79,29 +103,7 @@ class coco_tools:
             mask_temp[:, :, i] = temp_one_mask
         return mask_temp.astype(np.bool), class_ids
 
-    def LoadAnnoCOCO(self, file, imagefolder_path):
-        self.imagefolder_path = imagefolder_path
-        self.file = file
-        with open(file, 'r') as f:
-            dict1 = json.load(f)
-        self.info = dict1["info"]
-        self.licenses = dict1["licenses"]
-        self.images = dict1["images"]
-        self.annotations = dict1["annotations"]
-        self.categories = dict1["categories"]
-        self.segment_info = dict1["segment_info"]
-        self.image_ids = []
-        for image in self.images:
-            if image['id'] not in self.image_ids:
-                self.image_ids.append(image['id'])
-        count = 0
-        self.category2sparse_onehot = {}
-        self.sparse_onehot2category = []
-        for category in self.categories:
-            if category['id'] not in self.category2sparse_onehot:
-                self.category2sparse_onehot[category['id']] = count
-                self.sparse_onehot2category.append(category['id'])
-                count += 1
+
 
     def GetOriginalImage(self, image_id):
         image_name = self.GetImageName(image_id)
