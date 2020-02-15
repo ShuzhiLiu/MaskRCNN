@@ -44,6 +44,10 @@ Complete Mask scoring r cnn with pure TensorFlow 2.0
 ![image](https://img-blog.csdn.net/20180120100214929?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamlvbmduaW1h/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
 #### Advantages of Faster R-CNN:
 1. Achieved end-to-end training
+### Mask R-CNN (2017)([Paper](https://arxiv.org/abs/1703.06870))  
+...
+### Mask scoring R-CNN (2019)([Paper](https://arxiv.org/abs/1903.00241))  
+...
 ## Details of NN
 ### RPN ( Region Proposal Network )
 ![image](https://img-blog.csdn.net/20180120101005481?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamlvbmduaW1h/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
@@ -73,8 +77,11 @@ The size of feature maps to 7*7
 
 Similar to the RPN, RoI Pooling Layer also only trains the positive RoI.
 ## How to train and test data
-1. Update the path information inside the config file under Configs folder
-2. Run TrainAndTest.py
+1. Run setup.py
+2. Update the path information inside the config file under Configs folder
+    * update `DATA_JSON_FILE` to your json file
+    * update `PATH_IMAGES` to your image folder
+3. Run TrainAndTest.py
 ## Update 2020/02/15
 ### made RPN(Region Proposal Network) head  
 ![image](Model_Images/RPN_header_model.png)
