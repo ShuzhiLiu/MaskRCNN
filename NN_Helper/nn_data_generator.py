@@ -15,16 +15,17 @@ class NN_data_generator():
                  ratios,
                  scales,
                  n_anchors,
-                 img_shape_resize=(720, 1280), img_shape_ori=(720, 1280), n_stage=5,
-                 threshold_iou_rpn = 0.7,
-                 threshold_iou_roi = 0.55
+                 img_shape_resize=(800, 1333, 3), n_stage=5,
+                 threshold_iou_rpn=0.7,
+                 threshold_iou_roi=0.55
                  ):
         # TODO: complete the resize part of the data generator
         self.threshold_iou_rpn = threshold_iou_rpn
         self.threshold_iou_roi = threshold_iou_roi
-        self.dataset_coco = coco_tools(file, imagefolder_path)
-        self.anchor_generator = gen_candidate_anchors(base_size=base_size,ratios=ratios, scales=scales, img_shape=img_shape_resize, n_stage=n_stage, n_anchors=n_anchors)
-        self.img_shape_ori = img_shape_ori
+        self.dataset_coco = coco_tools(file, imagefolder_path, img_shape_resize)
+        self.gen_candidate_anchors = gen_candidate_anchors(base_size=base_size, ratios=ratios, scales=scales,
+                                                           img_shape=img_shape_resize, n_stage=n_stage,
+                                                           n_anchors=n_anchors)
         self.img_shape_resize = img_shape_resize
 
     def _resize_img(self, img):
@@ -43,7 +44,7 @@ class NN_data_generator():
 
         bboxes_ious = []  # for each gt_bbox calculate ious with candidates
         for bbox in bboxes:
-            ious = bbox_tools.ious(self.anchor_generator.anchor_candidates_list, bbox)
+            ious = bbox_tools.ious(self.gen_candidate_anchors.anchor_candidates_list, bbox)
             ious_temp = np.ones(shape=(len(ious)), dtype=np.float) * 0.5
             # other author's implementations are use -1 to indicate ignoring, here use 0.5 to use max
             ious_temp = np.where(np.asarray(ious) > self.threshold_iou_rpn, 1, ious_temp)
@@ -55,78 +56,32 @@ class NN_data_generator():
         anchors_target = np.array(bboxes_ious)
         anchors_target = np.max(anchors_target, axis=0)
         anchors_target = np.reshape(anchors_target, newshape=(
-            self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
+            self.gen_candidate_anchors.h, self.gen_candidate_anchors.w, self.gen_candidate_anchors.n_anchors))
         if debuginfo:
             print(f"[Debug INFO] Number of total gt bboxes :{len(bboxes)}")
             print(
                 f"[Debug INFO] Number of total target anchors: {anchors_target[np.where(anchors_target == 1)].shape[0]}")
             print(f"[Debug INFO] Shape of anchors_target: {anchors_target.shape}")
             print(
-                f"[Debug INFO] Selected anchors: \n {self.anchor_generator.anchor_candidates[np.where(anchors_target == 1)]}")
+                f"[Debug INFO] Selected anchors: \n {self.gen_candidate_anchors.anchor_candidates[np.where(anchors_target == 1)]}")
         # test
         # self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] = self.anchor_generator.anchors_candidate[np.where(anchors_target==1)] +100
         # print(f"Selected anchors: \n {self.anchor_generator.anchors_candidate[np.where(anchors_target == 1)]}")
 
         # for each gt_box, determine the box reg target
         bbox_reg_target = np.zeros(
-            shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors, 4),
+            shape=(self.gen_candidate_anchors.h, self.gen_candidate_anchors.w, self.gen_candidate_anchors.n_anchors, 4),
             dtype=np.float)
         for index, bbox_ious in enumerate(bboxes_ious):
             ious_temp = np.reshape(bbox_ious, newshape=(
-                self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
+                self.gen_candidate_anchors.h, self.gen_candidate_anchors.w, self.gen_candidate_anchors.n_anchors))
             gt_box = bboxes[index]
-            candidate_boxes = self.anchor_generator.anchor_candidates[np.where(ious_temp == 1)]
+            candidate_boxes = self.gen_candidate_anchors.anchor_candidates[np.where(ious_temp == 1)]
             # print(candidate_boxes,gt_box)
             box_reg = bbox_tools.bbox_regression_target(candidate_boxes, gt_box)
             # print(box_reg)
             # print(bbox_tools.bbox_reg2truebox(candidate_boxes, box_reg))
             bbox_reg_target[np.where(ious_temp == 1)] = box_reg
-
-        # !!!!!!!!!!!!!!This part is for simulate the loss function with numpy and tensorflow. Don't Delate!!!!!!!!!!!!!!!
-        # determine the weight, this will be implement in the tensorflow loss function in the future
-        # bbox_inside_weight = np.ones(shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors), dtype=np.float) * -1
-        # print(f"[Debug INFO NP REF] Original weight in target loc: {bbox_inside_weight[np.where(anchors_target==1)]}")
-        # bbox_inside_weight[np.where(anchors_target==1)] = bbox_inside_weight[np.where(anchors_target==1)] * 0 + 1
-        # print(f"[Debug INFO NP REF] Modified weight in target loc: {bbox_inside_weight[np.where(anchors_target == 1)]}")
-        # print(f"[Debug INFO NP REF] Number of foreground : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
-        # n_zeros = bbox_inside_weight[np.where(anchors_target==0)].shape[0]
-        # temp_random_choice = [-1] * (n_zeros-128) + [1] * 128
-        # random.shuffle(temp_random_choice)
-        # # print(np.array(temp_random_choice))
-        # bbox_inside_weight[np.where(anchors_target == 0)] = np.array(temp_random_choice)
-        # print(f"[Debug INFO NP REF] Number of foreground + 128 random chose background : {bbox_inside_weight[np.where(bbox_inside_weight == 1)].shape[0]}")
-        # bbox_outside_weight = None
-        #
-        # # test tensorflow
-        # bbox_inside_weight = tf.ones(
-        #     shape=(self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors)) * -1
-        # indices_foreground = tf.where(tf.equal(anchors_target, 1))
-        # n_foreground = indices_foreground.get_shape().as_list()[0]
-        # print(f"[Debug INFO TF TEST] Original weight in target loc: {tf.gather_nd(params=bbox_inside_weight, indices=indices_foreground)}")
-        # bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_foreground, updates=[1]*len(indices_foreground))
-        # print(f"[Debug INFO TF TEST] Modified weight in target loc: {tf.gather_nd(params=bbox_inside_weight, indices=indices_foreground)}")
-        # print(f"[Debug INFO TF TEST] Number of foreground : {len(indices_foreground)}")
-        # indices_background = tf.where(tf.equal(anchors_target, 0))
-        # print(indices_background.get_shape().as_list())
-        # n_background = indices_background.get_shape().as_list()[0]
-        # print(n_background)
-        # selected_ratio = n_foreground/n_background
-        # remain_ration = (n_background-n_foreground)/n_background
-        # print(selected_ratio, remain_ration)
-        # # temp_random_choice = tf.random.categorical(tf.math.log([[remain_ration, selected_ratio]]), n_background)
-        # # temp_random_choice = tf.reshape(temp_random_choice, (-1,))
-        # # temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
-        #
-        # temp_random_choice = tf.random.categorical(tf.math.log([[remain_ration, selected_ratio]]), 23*40*9)
-        # temp_random_choice = tf.reshape(temp_random_choice, (23,40,9))
-        # temp_random_choice = tf.gather_nd(temp_random_choice, indices_background)
-        # temp_random_choice = tf.dtypes.cast(temp_random_choice, tf.float32)
-        # # print(np.array(temp_random_choice))
-        # bbox_inside_weight = tf.tensor_scatter_nd_update(tensor=bbox_inside_weight, indices=indices_background, updates=temp_random_choice)
-        # indices_train = tf.where(tf.equal(bbox_inside_weight, 1))
-        #
-        # print(
-        #     f"[Debug INFO TF TEST] Number of foreground + {n_foreground} random chose background : {len(indices_train)}")
 
         return anchors_target, bbox_reg_target
 
@@ -136,7 +91,7 @@ class NN_data_generator():
 
         bboxes_ious = []  # for each gt_bbox calculate ious with candidates
         for bbox in bboxes:
-            ious = bbox_tools.ious(self.anchor_generator.anchor_candidates_list, bbox)
+            ious = bbox_tools.ious(self.gen_candidate_anchors.anchor_candidates_list, bbox)
             ious_temp = np.ones(shape=(len(ious)), dtype=np.float) * 0.5
             # other author's implementations are use -1 to indicate ignoring, here use 0.5 to use max
             ious_temp = np.where(np.asarray(ious) > self.threshold_iou_rpn, 1, ious_temp)
@@ -149,8 +104,8 @@ class NN_data_generator():
         target_classes = []
         for index, bbox_ious in enumerate(bboxes_ious):
             ious_temp = np.reshape(bbox_ious, newshape=(
-                self.anchor_generator.h, self.anchor_generator.w, self.anchor_generator.n_anchors))
-            candidate_boxes = self.anchor_generator.anchor_candidates[np.where(ious_temp == 1)]
+                self.gen_candidate_anchors.h, self.gen_candidate_anchors.w, self.gen_candidate_anchors.n_anchors))
+            candidate_boxes = self.gen_candidate_anchors.anchor_candidates[np.where(ious_temp == 1)]
             n = candidate_boxes.shape[0]
             for i in range(n):
                 target_anchor_bboxes.append(candidate_boxes[i])

@@ -1,11 +1,11 @@
 from Debugger import DebugPrint
 import numpy as np
 import tensorflow as tf
-from NN_Parts import Backbone
+from NN_Components import Backbone
 
 
 class RoI:
-    def __init__(self, backbone_model, IMG_SHAPE, lr=1e-4, n_stage=5):
+    def __init__(self, backbone_model, IMG_SHAPE, n_output_classes=80,lr=1e-4):
         self.backbone_model = backbone_model
         self.lr = lr
         self.input_bockbone = tf.keras.Input(shape=backbone_model.input.shape[1:], dtype=tf.float32,
@@ -20,10 +20,10 @@ class RoI:
         img_shape_constant = tf.constant([IMG_SHAPE[0], IMG_SHAPE[1], IMG_SHAPE[0], IMG_SHAPE[1]], tf.float32)
         proposal_boxes2 = tf.math.divide(proposal_boxes, img_shape_constant)
 
-        image_crop = tf.image.crop_and_resize(feature_map, proposal_boxes2, indices, [6, 6])
+        image_crop = tf.image.crop_and_resize(feature_map, proposal_boxes2, indices, [7, 7])
         flatten1 = tf.keras.layers.GlobalAveragePooling2D()(image_crop)
         fc1 = tf.keras.layers.Dense(units=1024, activation='relu')(flatten1)
-        class_header = tf.keras.layers.Dense(units=81, activation='softmax')(fc1)
+        class_header = tf.keras.layers.Dense(units=n_output_classes+1, activation='softmax')(fc1)
         box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc1)
 
         self.RoI_header_model = tf.keras.Model(inputs=[feature_map, proposal_boxes],
@@ -33,13 +33,15 @@ class RoI:
         RoI_with_backbone_out1, RoI_with_backbone_out2 = self.RoI_header_model([backbone_out, proposal_boxes])
         self.RoI_with_backbone_model = tf.keras.Model(inputs=[self.input_bockbone, proposal_boxes],
                                                       outputs=[RoI_with_backbone_out1, RoI_with_backbone_out2])
-        tf.keras.utils.plot_model(self.RoI_header_model, 'RoI_header_model.png', show_shapes=True)
-        tf.keras.utils.plot_model(self.RoI_with_backbone_model, 'RoI_with_backbone_model.png', show_shapes=True)
 
         # --- for train step ---
         self.huber = tf.keras.losses.Huber()
         self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
         self.optimizer_header = tf.keras.optimizers.Adam(self.lr)
+
+    def visualize_model(self):
+        tf.keras.utils.plot_model(self.RoI_header_model, 'RoI_header_model.png', show_shapes=True)
+        tf.keras.utils.plot_model(self.RoI_with_backbone_model, 'RoI_with_backbone_model.png', show_shapes=True)
 
     @tf.function
     def train_step_with_backbone(self, input_image, proposal_box, class_header, box_reg_header):
@@ -66,4 +68,5 @@ class RoI:
 
 if __name__ == '__main__':
     b1 = Backbone()
-    t1 = RoI(b1.backbone_model, IMG_SHAPE=(720, 1280, 3))
+    t1 = RoI(b1.backbone_model, IMG_SHAPE=(800, 1333, 3))
+    t1.visualize_model()

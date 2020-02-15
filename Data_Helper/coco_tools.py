@@ -8,8 +8,12 @@ from copy import deepcopy
 
 
 class coco_tools:
-    def __init__(self, jsonfile, imagefolder_path):
+    def __init__(self, jsonfile, imagefolder_path, resized_shape=None):
         self.LoadAnnoCOCO(jsonfile, imagefolder_path)
+        self.RESIZE_FLAG = False
+        self.resized_shape = resized_shape
+        if resized_shape != None:
+            self.RESIZE_FLAG = True
 
     def LoadAnnoCOCO(self, file, imagefolder_path):
         self.imagefolder_path = imagefolder_path
@@ -21,7 +25,7 @@ class coco_tools:
         self.images = dict1["images"]
         self.annotations = dict1["annotations"]
         self.categories = dict1["categories"]
-        self.segment_info = dict1["segment_info"]
+        # self.segment_info = dict1["segment_info"]
         self.image_ids = []
         for image in self.images:
             if image['id'] not in self.image_ids:
@@ -35,26 +39,30 @@ class coco_tools:
                 self.sparse_onehot2category.append(category['id'])
                 count += 1
 
+    def _resize_anno(self):
+        for image_id in self.image_ids:
+            original_shape = self.GetImageShape(image_id)
+
+
     def DrawSegmFromAnnoCoco(self, image_id, Original_Image, annos, show=False, savefile=False):
         height, width = self.GetImageShape(image_id)
-        bboxes = []
-        for anno in annos:
-            if anno['image_id'] == image_id:
-                bboxes.append(anno['bbox'])
-        bboxes_int = np.array(bboxes, dtype=np.int)
+        if self.RESIZE_FLAG:
+            height, width,_ = self.resized_shape
+        bboxes_int = self.GetOriginalBboxesList(image_id)   # format (x1,y1,x2,y2)
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
         masks_pred, class_ids = self.GetSegmMaskFromAnnoCOCO(annos, image_id)
         _, _, n_masks = masks_pred.shape
         for i in range(n_masks):
             color_random = np.random.randint(0, 256, (1, 3), dtype=np.uint8)
             color_random2 = color_random.tolist()
+            # opencv need format (y1, x1, y2, x2)
             cv2.rectangle(tempimg,
-                          (bboxes_int[i, 0], bboxes_int[i, 1]),
-                          (bboxes_int[i, 0] + bboxes_int[i, 2], bboxes_int[i, 1] + bboxes_int[i, 3]),
+                          (bboxes_int[i][1], bboxes_int[i][0]),
+                          (bboxes_int[i][3], bboxes_int[i][2]),
                           color_random2[0],
                           2)
             cv2.putText(tempimg, f'{i + 1}th Object_{class_ids[i]}',
-                        (bboxes_int[i, 0] + bboxes_int[i, 2] + 10, bboxes_int[i, 1] + bboxes_int[i, 3]),
+                        (bboxes_int[i][3] + 10, bboxes_int[i][2]),
                         0, 0.3, color_random2[0])
             tempimg[:, :, 0][masks_pred[:, :, i]] = color_random[0, 0]
             tempimg[:, :, 1][masks_pred[:, :, i]] = color_random[0, 1]
@@ -89,16 +97,23 @@ class coco_tools:
     def GetSegmMaskFromAnnoCOCO(self, annos, image_id):
         segms = []
         height, width = self.GetImageShape(image_id)
+        if self.RESIZE_FLAG:
+            height, width,_ = self.resized_shape
         class_ids = []
         for anno in annos:
-            if anno['image_id'] == image_id:
-                segms.append(np.reshape(anno['segmentation'][0], newshape=(-1, 2)))
+            if anno['image_id'] == image_id and isinstance(anno['segmentation'], list):
+                segm_temp = np.reshape(anno['segmentation'][0], newshape=(-1, 2))
+                if self.RESIZE_FLAG:
+                    original_shape = self.GetImageShape(image_id)
+                    # Note that opencv format is (y, x) here, different from numpy (x, y)
+                    segm_temp = segm_temp/ np.asarray([original_shape[1],original_shape[0]]) *np.asarray([self.resized_shape[1],self.resized_shape[0]])
+                segms.append(segm_temp.astype(int))
                 class_ids.append(anno['category_id'])
         n_segms = len(segms)
         mask_temp = np.zeros(shape=(height, width, n_segms), dtype=np.uint8)
         for i in range(n_segms):
             temp_one_mask = np.zeros(shape=(height, width), dtype=np.uint8)
-            contour = (np.array(segms[i])).astype(int)
+            contour = segms[i]
             cv2.fillPoly(img=temp_one_mask, pts=[contour], color=1)
             mask_temp[:, :, i] = temp_one_mask
         return mask_temp.astype(np.bool), class_ids
@@ -108,16 +123,29 @@ class coco_tools:
     def GetOriginalImage(self, image_id):
         image_name = self.GetImageName(image_id)
         img = cv2.imread(f"{self.imagefolder_path}/{image_name}")
+        if self.RESIZE_FLAG:
+            img = cv2.resize(img, (self.resized_shape[1],self.resized_shape[0]), interpolation = cv2.INTER_AREA)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         return np.array(img_rgb)
 
     def GetOriginalBboxesList(self, image_id):
         # read original opencv bbox and convert to numpy format bbox
+        '''
+        x: vertical, y: horizontal. (x, y) is the format for numpy array
+        opencv box format: (y, x, dy, dx)
+        output box format: (x1, y1, x2, y2)
+        '''
         Bboxes = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
                 bbox = np.array(anno['bbox'], dtype=np.int)
                 bbox[0], bbox[1], bbox[2], bbox[3] = bbox[1], bbox[0], bbox[1] + bbox[3], bbox[0] + bbox[2]
+                if self.RESIZE_FLAG:
+                    original_shape = self.GetImageShape(image_id)
+                    bbox[0] = bbox[0] / original_shape[0] * self.resized_shape[0]
+                    bbox[1] = bbox[1] / original_shape[1] * self.resized_shape[1]
+                    bbox[2] = bbox[2] / original_shape[0] * self.resized_shape[0]
+                    bbox[3] = bbox[3] / original_shape[1] * self.resized_shape[1]
                 Bboxes.append(bbox)
         return Bboxes
 
@@ -263,9 +291,36 @@ class coco_tools:
                     f,
                     indent=4)
 
+    def MakeTrainSample(self, n, file):
+        images = []
+        annotations = []
+        images += self.images[:n]
+        for image in images:
+            image_id = image['id']
+            for anno in self.annotations:
+                if anno['image_id'] == image_id:
+                    annotations.append(anno)
+        anno_json = {
+            "info": self.info,
+            "licenses": self.licenses,
+            "images": images,
+            "annotations": annotations,
+            "categories": self.categories,
+            # "segment_info": self.segment_info
+        }
+        with open(file, 'w') as f:
+            json.dump(anno_json, f)
+
+
 
 if __name__ == '__main__':
-    file = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data/1940091026744/annotations/train.json'
-    image_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
-    t1 = coco_tools(file, image_path)
-    t1.DrawWithImageID(t1.image_ids[0])
+    # file = '/Volumes/HDD500/mmdetection_tools/data/1988605221046/annotations/train.json'
+    # image_path = '/Volumes/HDD500//mmdetection_tools/LocalData_Images'
+    # file = '/Volumes/HDD500/Dataset/COCO2017/annotations/instances_val2017.json'
+    # file_sample = '/Volumes/HDD500/Dataset/COCO2017/annotations/instances_val2017_sample.json'
+    # image_path = '/Volumes/HDD500/Dataset/COCO2017/val2017'
+    file = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017.json'
+    file_sample = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017_sample.json'
+    image_path = '/media/liushuzhi/HDD500/Dataset/COCO2017/val2017'
+    t1 = coco_tools(file, image_path, resized_shape=(800,1333, 3))
+    t1.MakeTrainSample(n=20, file=file_sample)

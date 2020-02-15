@@ -47,7 +47,7 @@ def Backbone_test():
 
 
 class Backbone:
-    def __init__(self, IMG_SHAPE=(720, 1280, 3), n_stage=5):
+    def __init__(self, IMG_SHAPE=(800, 1333, 3), n_stage=5):
         # the stages of other implementation is 4, note that this ResNet50V2 has 5!
         self.base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
                                                            include_top=False)
@@ -62,7 +62,7 @@ class Backbone:
         # ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(bh1)
         # self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[ac1],name='BACKBONE_MODEL')
 
-    def plot_model(self):
+    def visualize_model(self):
         tf.keras.utils.plot_model(model=self.backbone_model, to_file='base_model_modified.png', show_shapes=True)
 
     def get_output_shape(self):
@@ -77,5 +77,5 @@ class Backbone:
 
 if __name__ == '__main__':
     t1 = Backbone()
-    t1.plot_model()
+    t1.visualize_model()
     Backbone_test()

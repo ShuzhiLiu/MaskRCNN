@@ -1,5 +1,5 @@
 import tensorflow as tf
-from NN_Parts import Backbone
+from NN_Components import Backbone
 
 class MaskRCNN():
     def __init__(self,IMG_SHAPE):

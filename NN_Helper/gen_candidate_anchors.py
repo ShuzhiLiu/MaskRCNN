@@ -11,12 +11,12 @@ class gen_candidate_anchors:
                  base_size=16,
                  ratios=None,
                  scales=2 ** np.arange(3, 6),
-                 img_shape=(720, 1280),
+                 img_shape=(800, 1333, 3),
                  n_stage=5,
                  n_anchors=9):
         if ratios is None:
             ratios = [0.5, 1, 2]
-        self.img_shape = img_shape
+        self.img_shape = (img_shape[0],img_shape[1])
         self.n_stage_revert_factor = 2 ** n_stage
         self.base_anchors = gen_base_anchors.gen_base_anchors(base_size=base_size, ratios=ratios,
                                                               scales=scales)
@@ -24,7 +24,7 @@ class gen_candidate_anchors:
         self.h = int(img_shape[0] / self.n_stage_revert_factor) + int((img_shape[0] % self.n_stage_revert_factor) > 0)
         self.w = int(img_shape[1] / self.n_stage_revert_factor) + int((img_shape[1] % self.n_stage_revert_factor) > 0)
         self.n_anchors = n_anchors
-        self.anchor_candidates = self.gen_all_candidate_anchors(self.h, self.w, self.n_anchors, img_shape)
+        self.anchor_candidates = self.gen_all_candidate_anchors(self.h, self.w, self.n_anchors, self.img_shape)
         self.anchor_candidates_list = list(np.reshape(self.anchor_candidates, newshape=(-1, 4)).tolist())
 
     def gen_all_candidate_anchors(self, h, w, num_anchors, image_shape):
@@ -67,7 +67,7 @@ def get_featureMap_h_w_with_n_stages(img_shape, n_stage):
 
 
 if __name__ == '__main__':
-    t1 = gen_candidate_anchors()
+    t1 = gen_candidate_anchors(base_size=12)
     DebugPrint("base anchors", t1.base_anchors)
     DebugPrint("9 Anchors candidate at [0,0]", t1.anchor_candidates[0, 0, :, :])
     DebugPrint("9 Anchors candidate at [10,10]", t1.anchor_candidates[10, 10, :, :])
@@ -79,6 +79,6 @@ if __name__ == '__main__':
     # temp = t1.anchors_candidate.reshape((-1, 4))
     temp = np.reshape(t1.anchor_candidates, newshape=(-1, 4))
     DebugPrint("Same with Anchor candidate at [0,0,2] after reshape", temp[2, :])
-    temp2 = temp.reshape((23, 40, 9, 4))
+    temp2 = temp.reshape((t1.h, t1.w, t1.n_anchors, 4))
     DebugPrint("Same with temp[2,:] after reshape", temp2[0, 0, 2, :])
     DebugPrint("Same anchor in anchor list", t1.anchor_candidates_list[2])

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from NN_Parts import Backbone
+from NN_Components import Backbone
 import random
 import numpy as np
 from Debugger import DebugPrint
@@ -57,14 +57,15 @@ class RPN:
             name='RPN_BBOX_Regression_Pred').output.shape[1:]
         self.N_total_anchors = self.shape_Anchor_Target[0] * self.shape_Anchor_Target[1] * self.shape_Anchor_Target[2]
 
-        # tf.keras.utils.plot_model(model=self.RPN_header_model, to_file='RPN_header_model.png', show_shapes=True)
-        tf.keras.utils.plot_model(model=self.RPN_with_backbone_model, to_file='RPN_with_backbone.png', show_shapes=True)
-
-        self._RPN_train_model()
-
         # --- for low level training ---
         self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
         self.optimizer_header = tf.keras.optimizers.Adam(self.lr)
+
+    def visualize_model(self):
+        tf.keras.utils.plot_model(model=self.RPN_header_model, to_file='RPN_header_model.png', show_shapes=True)
+        tf.keras.utils.plot_model(model=self.RPN_with_backbone_model, to_file='RPN_with_backbone.png', show_shapes=True)
+
+        self._RPN_train_model()
 
     def _RPN_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
@@ -162,3 +163,4 @@ class RPN:
 if __name__ == '__main__':
     b1 = Backbone()
     t1 = RPN(b1.backbone_model)
+    t1.visualize_model()
