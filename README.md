@@ -72,11 +72,13 @@ For each RoI, RoI Pooling Layer reshapes
 The size of feature maps to 7*7
 
 Similar to the RPN, RoI Pooling Layer also only trains the positive RoI.
-
+## How to train and test data
+1. Update the path information inside the config file under Configs folder
+2. Run TrainAndTest.py
 ## Update 2020/02/15
-* made RPN(Region Proposal Network) head  
+### made RPN(Region Proposal Network) head  
 ![image](Model_Images/RPN_header_model.png)
-* made RoI(Region of Interest) head
+### made RoI(Region of Interest) head
 ![image](Model_Images/RoI_header_model.png)
 ## TODO
 * optimize the program
