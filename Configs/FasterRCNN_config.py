@@ -17,8 +17,8 @@ class Param:
     THRESHOLD_IOU_RoI = 0.55
 
     # --- RPN ---
-    PATH_MODEL = '/SavedModels'
-    PATH_DEBUG_IMG = '/SavedDebugImages'
+    PATH_MODEL = 'SavedModels'
+    PATH_DEBUG_IMG = 'SavedDebugImages'
     LR = 0.0001         # Currently, it doesn't work when lr > 0.0001
     LAMBDA_FACTOR = 1   # Don't change now! This factor is for balancing the RPN losses. 1 is the best now!!
     EPOCH = 12
