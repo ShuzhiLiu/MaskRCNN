@@ -85,14 +85,21 @@ Similar to the RPN, RoI Pooling Layer also only trains the positive RoI.
 ## Update 2020/01/18
 ### made RPN(Region Proposal Network) head  
 ![image](Model_Images/RPN_header_model.png)
+#### RPN with backbone
+![image](Model_Images/RPN_with_backbone.png)
 ### made RoI(Region of Interest) head
 ![image](Model_Images/RoI_header_model.png)
+#### RoI with backbone
+![image](Model_Images/RoI_with_backbone_model.png)
 ## TODO
 * optimize the program
+* run [cocoeval](http://cocodataset.org/#format-data)
 * mask head
 * score head
 * convert to tensorflow lite
 ## Resources for learning Mask scoring r cnn
 * [Faster_RCNN Pytorch implementation](https://github.com/Jacqueline121/Faster_RCNN_pytorch)
 * [Faster_RCNN Pytorch implementation2](https://github.com/chenyuntc/simple-faster-rcnn-pytorch)
+* [mmdetection](https://github.com/open-mmlab/mmdetection)
+* [detectron2](https://github.com/facebookresearch/detectron2)
 * [Mask R CNN blog](https://blog.csdn.net/jiongnima/article/details/79094159)
