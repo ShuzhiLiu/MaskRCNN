@@ -2,7 +2,7 @@
 ## GOAL  
 Complete Mask scoring r cnn with pure TensorFlow 2.0
 ## Introduction
-### R-CNN: Regions with CNN features (2014) ([Paper](https://arxiv.org/pdf/1311.2524.pdf))
+### R-CNN: Regions with CNN features (2014) ([Paper](https://arxiv.org/abs/1311.2524))
 ![image](https://img-blog.csdn.net/20180120101132064?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvamlvbmduaW1h/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/SouthEast)
 #### Steps:
 1. Generate 2000 areas as candidates  
@@ -82,7 +82,7 @@ Similar to the RPN, RoI Pooling Layer also only trains the positive RoI.
     * update `DATA_JSON_FILE` to your json file
     * update `PATH_IMAGES` to your image folder
 3. Run TrainAndTest.py
-## Update 2020/02/15
+## Update 2020/01/18
 ### made RPN(Region Proposal Network) head  
 ![image](Model_Images/RPN_header_model.png)
 ### made RoI(Region of Interest) head
