@@ -8,15 +8,16 @@ from copy import deepcopy
 
 
 class CocoTools:
-    def __init__(self, jsonfile, imagefolder_path, resized_shape=None):
-        self.load_anno_coco(jsonfile, imagefolder_path)
+    def __init__(self, json_file, image_folder_path, resized_shape=None):
+        self.segment_info = None
+        self.load_anno_coco(json_file, image_folder_path)
         self.RESIZE_FLAG = False
         self.resized_shape = resized_shape
         if resized_shape != None:
             self.RESIZE_FLAG = True
 
-    def load_anno_coco(self, file, imagefolder_path):
-        self.imagefolder_path = imagefolder_path
+    def load_anno_coco(self, file, image_folder_path):
+        self.imagefolder_path = image_folder_path
         self.file = file
         with open(file, 'r') as f:
             dict1 = json.load(f)
@@ -73,7 +74,7 @@ class CocoTools:
         if savefile:
             plt.savefig(f'{os.getcwd()}/Images_Drawn/{image_id}.jpg', dpi=300)
 
-    def draw_bboxes(self, original_image, bboxes, show=False, savefile=False, path=None, savename=None):
+    def draw_bboxes(self, original_image, bboxes, show=False, save_file=False, path=None, save_name=None):
         # bbox is numpy format (x1, y1, x2, y2)
         height, width = original_image.shape[0], original_image.shape[1]
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
@@ -89,9 +90,9 @@ class CocoTools:
         plt.imshow(original_image)
         if show:
             plt.show()
-        if savefile:
+        if save_file:
             img_opencv = cv2.cvtColor(original_image, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(filename=f"{path}/{savename}.jpg", img=img_opencv)
+            cv2.imwrite(filename=f"{path}/{save_name}.jpg", img=img_opencv)
 
     def get_segm_mask_from_anno_coco(self, annos, image_id):
         segms = []
@@ -151,21 +152,21 @@ class CocoTools:
         categories_sparse = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
-                Sparse = self.category2sparse_onehot[anno['category_id']]
-                categories_sparse.append(Sparse)
+                sparse = self.category2sparse_onehot[anno['category_id']]
+                categories_sparse.append(sparse)
         return categories_sparse
 
     def get_original_segms_mask_list(self, image_id):
         # TODO: put mask list to dictionary of labels
         height, width = self.get_image_shape(image_id)
-        Masks = []
+        masks = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
                 img_temp = np.zeros(shape=(height, width), dtype=np.uint8)
                 contour = np.reshape(anno['segmentation'], newshape=(-1, 2)).astype(int)
                 img_temp = cv2.fillPoly(img_temp, [contour], 1)
-                Masks.append(img_temp)
-        return Masks
+                masks.append(img_temp)
+        return masks
 
     def get_image_name(self, image_id):
         for image in self.images:

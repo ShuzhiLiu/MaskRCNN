@@ -2,10 +2,10 @@ import tensorflow as tf
 import inspect
 
 
-def Backbone_test():
-    IMG_SHAPE = (224, 224, 3)
-    input1 = tf.keras.Input(shape=IMG_SHAPE)
-    base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
+def backbone_test():
+    img_shape = (224, 224, 3)
+    input1 = tf.keras.Input(shape=img_shape)
+    base_model = tf.keras.applications.ResNet50V2(input_shape=img_shape,
                                                   include_top=True)
     # entire pretrained model
     tf.keras.utils.plot_model(model=base_model, to_file='test_base_model.png', show_shapes=True)
@@ -78,4 +78,4 @@ class Backbone:
 if __name__ == '__main__':
     t1 = Backbone()
     t1.visualize_model()
-    Backbone_test()
+    backbone_test()

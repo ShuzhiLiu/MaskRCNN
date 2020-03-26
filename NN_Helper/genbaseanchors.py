@@ -8,36 +8,36 @@
 import numpy as np
 
 
-class gen_base_anchors:
-# Verify that we compute the same anchors as Shaoqing's matlab implementation:
-#
-#    >> load output/rpn_cachedir/faster_rcnn_VOC2007_ZF_stage1_rpn/anchors.mat
-#    >> anchors
-#
-#    anchors =
-#
-#       -83   -39   100    56
-#      -175   -87   192   104
-#      -359  -183   376   200
-#       -55   -55    72    72
-#      -119  -119   136   136
-#      -247  -247   264   264
-#       -35   -79    52    96
-#       -79  -167    96   184
-#      -167  -343   184   360
+class GenBaseAnchors:
+    # Verify that we compute the same anchors as Shaoqing's matlab implementation:
+    #
+    #    >> load output/rpn_cachedir/faster_rcnn_VOC2007_ZF_stage1_rpn/anchors.mat
+    #    >> anchors
+    #
+    #    anchors =
+    #
+    #       -83   -39   100    56
+    #      -175   -87   192   104
+    #      -359  -183   376   200
+    #       -55   -55    72    72
+    #      -119  -119   136   136
+    #      -247  -247   264   264
+    #       -35   -79    52    96
+    #       -79  -167    96   184
+    #      -167  -343   184   360
 
-#array([[ -83.,  -39.,  100.,   56.],
-#       [-175.,  -87.,  192.,  104.],
-#       [-359., -183.,  376.,  200.],
-#       [ -55.,  -55.,   72.,   72.],
-#       [-119., -119.,  136.,  136.],
-#       [-247., -247.,  264.,  264.],
-#       [ -35.,  -79.,   52.,   96.],
-#       [ -79., -167.,   96.,  184.],
-#       [-167., -343.,  184.,  360.]])
+    # array([[ -83.,  -39.,  100.,   56.],
+    #       [-175.,  -87.,  192.,  104.],
+    #       [-359., -183.,  376.,  200.],
+    #       [ -55.,  -55.,   72.,   72.],
+    #       [-119., -119.,  136.,  136.],
+    #       [-247., -247.,  264.,  264.],
+    #       [ -35.,  -79.,   52.,   96.],
+    #       [ -79., -167.,   96.,  184.],
+    #       [-167., -343.,  184.,  360.]])
     @classmethod
     def gen_base_anchors(cls, base_size=16, ratios=[0.5, 1, 2],
-                         scales=2**np.arange(3, 6)):
+                         scales=2 ** np.arange(3, 6)):
         """
         Generate anchor (reference) windows by enumerating aspect ratios X
         scales wrt a reference (0, 0, 15, 15) window.
@@ -48,7 +48,6 @@ class gen_base_anchors:
         anchors = np.vstack([cls._scale_enum(ratio_anchors[i, :], scales)
                              for i in range(ratio_anchors.shape[0])])
         return anchors
-
 
     @classmethod
     def _whctrs(cls, anchor):
@@ -61,7 +60,6 @@ class gen_base_anchors:
         x_ctr = anchor[0] + 0.5 * (w - 1)
         y_ctr = anchor[1] + 0.5 * (h - 1)
         return w, h, x_ctr, y_ctr
-
 
     @classmethod
     def _mkanchors(cls, ws, hs, x_ctr, y_ctr):
@@ -78,7 +76,6 @@ class gen_base_anchors:
                              y_ctr + 0.5 * (hs - 1)))
         return anchors
 
-
     @classmethod
     def _ratio_enum(cls, anchor, ratios):
         """
@@ -92,7 +89,6 @@ class gen_base_anchors:
         hs = np.round(ws * ratios)
         anchors = cls._mkanchors(ws, hs, x_ctr, y_ctr)
         return anchors
-
 
     @classmethod
     def _scale_enum(cls, anchor, scales):
@@ -109,8 +105,9 @@ class gen_base_anchors:
 
 if __name__ == '__main__':
     import time
+
     t = time.time()
-    a = gen_base_anchors.gen_base_anchors()
+    a = GenBaseAnchors.gen_base_anchors()
     print(time.time() - t)
     print(a)
     print(a.shape)

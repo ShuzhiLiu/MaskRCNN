@@ -2,7 +2,7 @@ import tensorflow as tf
 from NN_Components import Backbone
 import random
 import numpy as np
-from Debugger import DebugPrint
+from Debugger import debug_print
 
 
 class RPN:

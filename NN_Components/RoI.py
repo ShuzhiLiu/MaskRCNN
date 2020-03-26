@@ -1,4 +1,4 @@
-from Debugger import DebugPrint
+from Debugger import debug_print
 import numpy as np
 import tensorflow as tf
 from NN_Components import Backbone
@@ -23,7 +23,7 @@ class RoI:
         image_crop = tf.image.crop_and_resize(feature_map, proposal_boxes2, indices, [7, 7])
         flatten1 = tf.keras.layers.GlobalAveragePooling2D()(image_crop)
         fc1 = tf.keras.layers.Dense(units=1024, activation='relu')(flatten1)
-        class_header = tf.keras.layers.Dense(units=n_output_classes+1, activation='softmax')(fc1)
+        class_header = tf.keras.layers.Dense(units=n_output_classes + 1, activation='softmax')(fc1)
         box_reg_header = tf.keras.layers.Dense(units=4, activation='linear')(fc1)
 
         self.RoI_header_model = tf.keras.Model(inputs=[feature_map, proposal_boxes],

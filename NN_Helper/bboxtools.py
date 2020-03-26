@@ -1,32 +1,32 @@
 import numpy as np
 
 
-class bbox_tools:
+class BboxTools:
     # Beside ious, format of boxes is numpy.
     # format of boxes is list for ious
     @classmethod
     def ious(cls, boxes_list, box_1target):
         # box axis format: (x1,y1,x2,y2)
-        boxBArea = (box_1target[2] - box_1target[0] + 1) * (box_1target[3] - box_1target[1] + 1)
+        box_b_area = (box_1target[2] - box_1target[0] + 1) * (box_1target[3] - box_1target[1] + 1)
         ious = []
         for box in boxes_list:
             # determine the (x, y)-coordinates of the intersection rectangle
-            xA = max(box[0], box_1target[0])
-            yA = max(box[1], box_1target[1])
-            xB = min(box[2], box_1target[2])
-            yB = min(box[3], box_1target[3])
+            x_a = max(box[0], box_1target[0])
+            y_a = max(box[1], box_1target[1])
+            x_b = min(box[2], box_1target[2])
+            y_b = min(box[3], box_1target[3])
 
             # compute the area of intersection rectangle
-            interArea = max(0, xB - xA + 1) * max(0, yB - yA + 1)
+            inter_area = max(0, x_b - x_a + 1) * max(0, y_b - y_a + 1)
 
             # compute the area of both the prediction and ground-truth
             # rectangles
-            boxAArea = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
+            box_a_area = (box[2] - box[0] + 1) * (box[3] - box[1] + 1)
 
             # compute the intersection over union by taking the intersection
             # area and dividing it by the sum of prediction + ground-truth
             # areas - the interesection area
-            ious.append(interArea / float(boxAArea + boxBArea - interArea))
+            ious.append(inter_area / float(box_a_area + box_b_area - inter_area))
 
         # return the intersection over union value
         return ious
@@ -89,14 +89,14 @@ class bbox_tools:
         return xyxy.astype(np.int)
 
     @classmethod
-    def clip_boxes(cls, boxes, IMG_SHAPE):
-        x_max, y_max = IMG_SHAPE[0], IMG_SHAPE[1]
+    def clip_boxes(cls, boxes, img_shape):
+        x_max, y_max = img_shape[0], img_shape[1]
         boxes[:, 0][boxes[:, 0] < 0] = 0
         boxes[:, 1][boxes[:, 1] < 0] = 0
         boxes[:, 2][boxes[:, 2] < 0] = 1
         boxes[:, 3][boxes[:, 3] < 0] = 1
-        boxes[:, 0][boxes[:, 0] > x_max] = x_max-1
-        boxes[:, 1][boxes[:, 1] > y_max] = y_max-1
+        boxes[:, 0][boxes[:, 0] > x_max] = x_max - 1
+        boxes[:, 1][boxes[:, 1] > y_max] = y_max - 1
         boxes[:, 2][boxes[:, 2] > x_max] = x_max
         boxes[:, 3][boxes[:, 3] > y_max] = y_max
 
@@ -150,8 +150,6 @@ class bbox_tools:
 
         return pred_boxes
 
-
-
     @classmethod
     def clip_boxes_cls(cls, boxes, im_shape):
         boxes[:, 0::4].clamp_(0, im_shape[1] - 1)
@@ -169,7 +167,7 @@ if __name__ == '__main__':
     bbox1_whc = np.array([[5, 5, 10, 10], [5, 5, 10, 10]])
     bbox2_xyxy = np.array([[5, 5, 14, 14]])
     bbox2_whc = np.array([[10, 10, 10, 10]])
-    print(bbox_tools.xxyy2xywh(bbox1_xyxy))
-    print(bbox_tools.xywh2xxyy(bbox1_whc))
-    print(bbox_tools.ious([[0, 0, 9, 9], [0, 0, 9, 9]], [5, 5, 14, 14]))
-    print(bbox_tools.bbox_regression_target(bbox1_xyxy, bbox2_xyxy))
+    print(BboxTools.xxyy2xywh(bbox1_xyxy))
+    print(BboxTools.xywh2xxyy(bbox1_whc))
+    print(BboxTools.ious([[0, 0, 9, 9], [0, 0, 9, 9]], [5, 5, 14, 14]))
+    print(BboxTools.bbox_regression_target(bbox1_xyxy, bbox2_xyxy))
