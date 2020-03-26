@@ -7,15 +7,15 @@ from pycococreatortools import pycococreatortools
 from copy import deepcopy
 
 
-class coco_tools:
+class CocoTools:
     def __init__(self, jsonfile, imagefolder_path, resized_shape=None):
-        self.LoadAnnoCOCO(jsonfile, imagefolder_path)
+        self.load_anno_coco(jsonfile, imagefolder_path)
         self.RESIZE_FLAG = False
         self.resized_shape = resized_shape
         if resized_shape != None:
             self.RESIZE_FLAG = True
 
-    def LoadAnnoCOCO(self, file, imagefolder_path):
+    def load_anno_coco(self, file, imagefolder_path):
         self.imagefolder_path = imagefolder_path
         self.file = file
         with open(file, 'r') as f:
@@ -41,16 +41,15 @@ class coco_tools:
 
     def _resize_anno(self):
         for image_id in self.image_ids:
-            original_shape = self.GetImageShape(image_id)
+            original_shape = self.get_image_shape(image_id)
 
-
-    def DrawSegmFromAnnoCoco(self, image_id, Original_Image, annos, show=False, savefile=False):
-        height, width = self.GetImageShape(image_id)
+    def draw_segm_from_anno_coco(self, image_id, original_image, annos, show=False, savefile=False):
+        height, width = self.get_image_shape(image_id)
         if self.RESIZE_FLAG:
-            height, width,_ = self.resized_shape
-        bboxes_int = self.GetOriginalBboxesList(image_id)   # format (x1,y1,x2,y2)
+            height, width, _ = self.resized_shape
+        bboxes_int = self.get_original_bboxes_list(image_id)  # format (x1,y1,x2,y2)
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
-        masks_pred, class_ids = self.GetSegmMaskFromAnnoCOCO(annos, image_id)
+        masks_pred, class_ids = self.get_segm_mask_from_anno_coco(annos, image_id)
         _, _, n_masks = masks_pred.shape
         for i in range(n_masks):
             color_random = np.random.randint(0, 256, (1, 3), dtype=np.uint8)
@@ -67,18 +66,18 @@ class coco_tools:
             tempimg[:, :, 0][masks_pred[:, :, i]] = color_random[0, 0]
             tempimg[:, :, 1][masks_pred[:, :, i]] = color_random[0, 1]
             tempimg[:, :, 2][masks_pred[:, :, i]] = color_random[0, 2]
-        Original_Image = (Original_Image * 0.5 + tempimg * 0.5).astype(np.uint8)
-        plt.imshow(Original_Image)
+        original_image = (original_image * 0.5 + tempimg * 0.5).astype(np.uint8)
+        plt.imshow(original_image)
         if show:
             plt.show()
         if savefile:
             plt.savefig(f'{os.getcwd()}/Images_Drawn/{image_id}.jpg', dpi=300)
 
-    def DrawBboxes(self, Original_Image, Bboxes, show=False, savefile=False, path=None, savename=None):
+    def draw_bboxes(self, original_image, bboxes, show=False, savefile=False, path=None, savename=None):
         # bbox is numpy format (x1, y1, x2, y2)
-        height, width = Original_Image.shape[0], Original_Image.shape[1]
+        height, width = original_image.shape[0], original_image.shape[1]
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
-        for bbox in Bboxes:
+        for bbox in bboxes:
             color_random = np.random.randint(0, 256, (1, 3), dtype=np.uint8)
             color_random2 = color_random.tolist()
             cv2.rectangle(tempimg,
@@ -86,27 +85,28 @@ class coco_tools:
                           (bbox[3], bbox[2]),
                           color_random2[0],
                           2)
-        Original_Image = (Original_Image * 0.5 + tempimg * 0.5).astype(np.uint8)
-        plt.imshow(Original_Image)
+        original_image = (original_image * 0.5 + tempimg * 0.5).astype(np.uint8)
+        plt.imshow(original_image)
         if show:
             plt.show()
         if savefile:
-            img_opencv = cv2.cvtColor(Original_Image, cv2.COLOR_RGB2BGR)
+            img_opencv = cv2.cvtColor(original_image, cv2.COLOR_RGB2BGR)
             cv2.imwrite(filename=f"{path}/{savename}.jpg", img=img_opencv)
 
-    def GetSegmMaskFromAnnoCOCO(self, annos, image_id):
+    def get_segm_mask_from_anno_coco(self, annos, image_id):
         segms = []
-        height, width = self.GetImageShape(image_id)
+        height, width = self.get_image_shape(image_id)
         if self.RESIZE_FLAG:
-            height, width,_ = self.resized_shape
+            height, width, _ = self.resized_shape
         class_ids = []
         for anno in annos:
             if anno['image_id'] == image_id and isinstance(anno['segmentation'], list):
                 segm_temp = np.reshape(anno['segmentation'][0], newshape=(-1, 2))
                 if self.RESIZE_FLAG:
-                    original_shape = self.GetImageShape(image_id)
+                    original_shape = self.get_image_shape(image_id)
                     # Note that opencv format is (y, x) here, different from numpy (x, y)
-                    segm_temp = segm_temp/ np.asarray([original_shape[1],original_shape[0]]) *np.asarray([self.resized_shape[1],self.resized_shape[0]])
+                    segm_temp = segm_temp / np.asarray([original_shape[1], original_shape[0]]) * np.asarray(
+                        [self.resized_shape[1], self.resized_shape[0]])
                 segms.append(segm_temp.astype(int))
                 class_ids.append(anno['category_id'])
         n_segms = len(segms)
@@ -118,49 +118,46 @@ class coco_tools:
             mask_temp[:, :, i] = temp_one_mask
         return mask_temp.astype(np.bool), class_ids
 
-
-
-    def GetOriginalImage(self, image_id):
-        image_name = self.GetImageName(image_id)
+    def get_original_image(self, image_id):
+        image_name = self.get_image_name(image_id)
         img = cv2.imread(f"{self.imagefolder_path}/{image_name}")
         if self.RESIZE_FLAG:
-            img = cv2.resize(img, (self.resized_shape[1],self.resized_shape[0]), interpolation = cv2.INTER_AREA)
+            img = cv2.resize(img, (self.resized_shape[1], self.resized_shape[0]), interpolation=cv2.INTER_AREA)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         return np.array(img_rgb)
 
-    def GetOriginalBboxesList(self, image_id):
+    def get_original_bboxes_list(self, image_id):
         # read original opencv bbox and convert to numpy format bbox
         '''
         x: vertical, y: horizontal. (x, y) is the format for numpy array
         opencv box format: (y, x, dy, dx)
         output box format: (x1, y1, x2, y2)
         '''
-        Bboxes = []
+        bboxes = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
                 bbox = np.array(anno['bbox'], dtype=np.int)
                 bbox[0], bbox[1], bbox[2], bbox[3] = bbox[1], bbox[0], bbox[1] + bbox[3], bbox[0] + bbox[2]
                 if self.RESIZE_FLAG:
-                    original_shape = self.GetImageShape(image_id)
+                    original_shape = self.get_image_shape(image_id)
                     bbox[0] = bbox[0] / original_shape[0] * self.resized_shape[0]
                     bbox[1] = bbox[1] / original_shape[1] * self.resized_shape[1]
                     bbox[2] = bbox[2] / original_shape[0] * self.resized_shape[0]
                     bbox[3] = bbox[3] / original_shape[1] * self.resized_shape[1]
-                Bboxes.append(bbox)
-        return Bboxes
+                bboxes.append(bbox)
+        return bboxes
 
-    def GetOriginalCategorySparseList(self, image_id):
-        CategoriesSparse = []
+    def get_original_category_sparse_list(self, image_id):
+        categories_sparse = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
                 Sparse = self.category2sparse_onehot[anno['category_id']]
-                CategoriesSparse.append(Sparse)
-        return CategoriesSparse
+                categories_sparse.append(Sparse)
+        return categories_sparse
 
-
-    def GetOriginalSegmsMaskList(self, image_id):
+    def get_original_segms_mask_list(self, image_id):
         # TODO: put mask list to dictionary of labels
-        height, width = self.GetImageShape(image_id)
+        height, width = self.get_image_shape(image_id)
         Masks = []
         for anno in self.annotations:
             if anno['image_id'] == image_id:
@@ -170,30 +167,30 @@ class coco_tools:
                 Masks.append(img_temp)
         return Masks
 
-    def GetImageName(self, image_id):
+    def get_image_name(self, image_id):
         for image in self.images:
             if image['id'] == image_id:
                 return image['file_name']
 
-    def GetImageShape(self, image_id):
+    def get_image_shape(self, image_id):
         for image in self.images:
             if image['id'] == image_id:
                 return (image['height'], image['width'])
 
-    def DrawWithImageID(self, image_id):
-        original_image = self.GetOriginalImage(image_id)
-        self.DrawSegmFromAnnoCoco(image_id, original_image, self.annotations, True)
+    def draw_with_image_id(self, image_id):
+        original_image = self.get_original_image(image_id)
+        self.draw_segm_from_anno_coco(image_id, original_image, self.annotations, True)
 
-    def AgumentationOneImage(self, image_id):
+    def agumentation_one_image(self, image_id):
         annotation_ids = []
         for anno in self.annotations:
             annotation_ids.append(int(anno['id']))
 
         max_annotation_id = max(annotation_ids)
         counter = 1
-        masks, class_ids = self.GetSegmMaskFromAnnoCOCO(self.annotations, image_id)
+        masks, class_ids = self.get_segm_mask_from_anno_coco(self.annotations, image_id)
         masks = masks.astype(np.uint8)
-        img = self.GetOriginalImage(image_id)
+        img = self.get_original_image(image_id)
         _, _, n_masks = masks.shape
         image_dict = {}
         for img_dic in self.images:
@@ -270,14 +267,14 @@ class coco_tools:
             print(anno)
             self.annotations.append(anno)
 
-    def Augmentation(self):
+    def augmentation(self):
         if 'augmented' in self.info:
             print('already augmented')
             pass
         else:
             print('start augmenting')
             for image_id in self.image_ids:
-                self.AgumentationOneImage(image_id)
+                self.agumentation_one_image(image_id)
             self.info['augmented'] = 'yes'
             with open(self.file, 'w') as f:
                 json.dump({
@@ -291,7 +288,7 @@ class coco_tools:
                     f,
                     indent=4)
 
-    def MakeTrainSample(self, n, file):
+    def make_train_sample(self, n, file):
         images = []
         annotations = []
         images += self.images[:n]
@@ -312,7 +309,6 @@ class coco_tools:
             json.dump(anno_json, f)
 
 
-
 if __name__ == '__main__':
     # file = '/Volumes/HDD500/mmdetection_tools/data/1988605221046/annotations/train.json'
     # image_path = '/Volumes/HDD500//mmdetection_tools/LocalData_Images'
@@ -322,5 +318,5 @@ if __name__ == '__main__':
     file = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017.json'
     file_sample = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017_sample.json'
     image_path = '/media/liushuzhi/HDD500/Dataset/COCO2017/val2017'
-    t1 = coco_tools(file, image_path, resized_shape=(800,1333, 3))
-    t1.MakeTrainSample(n=20, file=file_sample)
+    t1 = CocoTools(file, image_path, resized_shape=(800, 1333, 3))
+    t1.make_train_sample(n=20, file=file_sample)

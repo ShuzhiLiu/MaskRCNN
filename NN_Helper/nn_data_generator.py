@@ -2,7 +2,7 @@ import json
 import numpy as np
 import cv2 as cv
 import matplotlib.pyplot as plt
-from Data_Helper import coco_tools
+from Data_Helper import CocoTools
 import random
 from NN_Helper import bbox_tools, gen_candidate_anchors
 import tensorflow as tf
@@ -22,7 +22,7 @@ class NN_data_generator():
         # TODO: complete the resize part of the data generator
         self.threshold_iou_rpn = threshold_iou_rpn
         self.threshold_iou_roi = threshold_iou_roi
-        self.dataset_coco = coco_tools(file, imagefolder_path, img_shape_resize)
+        self.dataset_coco = CocoTools(file, imagefolder_path, img_shape_resize)
         self.gen_candidate_anchors = gen_candidate_anchors(base_size=base_size, ratios=ratios, scales=scales,
                                                            img_shape=img_shape_resize, n_stage=n_stage,
                                                            n_anchors=n_anchors)
@@ -35,10 +35,10 @@ class NN_data_generator():
         pass
 
     def gen_train_input_one(self, image_id):
-        return self.dataset_coco.GetOriginalImage(image_id=image_id)
+        return self.dataset_coco.get_original_image(image_id=image_id)
 
     def gen_train_target_anchor_boxreg_for_RPN(self, image_id, debuginfo=False):
-        bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
+        bboxes = self.dataset_coco.get_original_bboxes_list(image_id=image_id)
 
         # === resize ===
 
@@ -86,8 +86,8 @@ class NN_data_generator():
         return anchors_target, bbox_reg_target
 
     def gen_target_anchor_bboxes_classes_for_Debug(self, image_id, debuginfo=False):
-        bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
-        SparseTargets = self.dataset_coco.GetOriginalCategorySparseList(image_id=image_id)
+        bboxes = self.dataset_coco.get_original_bboxes_list(image_id=image_id)
+        SparseTargets = self.dataset_coco.get_original_category_sparse_list(image_id=image_id)
 
         bboxes_ious = []  # for each gt_bbox calculate ious with candidates
         for bbox in bboxes:
@@ -130,8 +130,8 @@ class NN_data_generator():
         return np.array(inputs).astype(np.float), np.array(anchor_targets), np.array(bbox_reg_targets)
 
     def gen_train_data_RoI_one(self, image_id, bbox_list):
-        gt_bboxes = self.dataset_coco.GetOriginalBboxesList(image_id=image_id)
-        SparseTargets = self.dataset_coco.GetOriginalCategorySparseList(image_id=image_id)
+        gt_bboxes = self.dataset_coco.get_original_bboxes_list(image_id=image_id)
+        SparseTargets = self.dataset_coco.get_original_category_sparse_list(image_id=image_id)
 
         bboxes_ious = []  # for each gt_bbox calculate ious with candidates
         for bbox in gt_bboxes:
@@ -168,7 +168,7 @@ class NN_data_generator():
             target_bbox_reg)
 
     def _validate_bbox(self, image_id, bboxes):
-        img1 = self.dataset_coco.GetOriginalImage(image_id=image_id)
+        img1 = self.dataset_coco.get_original_image(image_id=image_id)
         for bbox in bboxes:
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             img1 = cv.rectangle(img1, (bbox[1], bbox[0]), (bbox[3], bbox[2]), color, 4)
@@ -176,9 +176,9 @@ class NN_data_generator():
         plt.show()
 
     def _validata_masks(self, image_id):
-        img1 = self.dataset_coco.GetOriginalImage(image_id=image_id)
+        img1 = self.dataset_coco.get_original_image(image_id=image_id)
         temp_img = np.zeros(shape=img1.shape, dtype=np.uint8)
-        Masks = self.dataset_coco.GetOriginalSegmsMaskList(image_id=image_id)
+        Masks = self.dataset_coco.get_original_segms_mask_list(image_id=image_id)
         for mask in Masks:
             color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
             temp_img[:, :, 0][mask.astype(bool)] = color[0]
@@ -196,7 +196,7 @@ def test2():
     image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
     t1 = NN_data_generator(file=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
                            imagefolder_path=imagefolder_path)
-    bboxes = t1.dataset_coco.GetOriginalBboxesList(image_id=image_id)
+    bboxes = t1.dataset_coco.get_original_bboxes_list(image_id=image_id)
     t1._validate_bbox(image_id=image_id, bboxes=bboxes)
     t1._validata_masks(image_id=image_id)
     t1.gen_train_target_anchor_boxreg_for_RPN(image_id=image_id)
@@ -207,11 +207,11 @@ def test():
     imagefolder_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
     DATASET_ID = '1940091026744'
     image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
-    data1 = coco_tools(jsonfile=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
-                       imagefolder_path=imagefolder_path)
-    img1 = data1.GetOriginalImage(image_id=image_id)
+    data1 = CocoTools(jsonfile=f"{BASE_PATH}/{DATASET_ID}/annotations/train.json",
+                      imagefolder_path=imagefolder_path)
+    img1 = data1.get_original_image(image_id=image_id)
     print(data1.images)
-    bboxes = data1.GetOriginalBboxesList(image_id=image_id)
+    bboxes = data1.get_original_bboxes_list(image_id=image_id)
     print(bboxes)
     # img1 = np.zeros(shape=(720,1280,3), dtype=np.uint8)
     for bbox in bboxes:

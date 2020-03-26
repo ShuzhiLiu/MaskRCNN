@@ -47,9 +47,9 @@ def Backbone_test():
 
 
 class Backbone:
-    def __init__(self, IMG_SHAPE=(800, 1333, 3), n_stage=5):
+    def __init__(self, img_shape=(800, 1333, 3), n_stage=5):
         # the stages of other implementation is 4, note that this ResNet50V2 has 5!
-        self.base_model = tf.keras.applications.ResNet50V2(input_shape=IMG_SHAPE,
+        self.base_model = tf.keras.applications.ResNet50V2(input_shape=img_shape,
                                                            include_top=False)
         if n_stage == 4:
             self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[

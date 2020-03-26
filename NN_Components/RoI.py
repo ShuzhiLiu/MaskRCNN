@@ -5,7 +5,7 @@ from NN_Components import Backbone
 
 
 class RoI:
-    def __init__(self, backbone_model, IMG_SHAPE, n_output_classes=80,lr=1e-4):
+    def __init__(self, backbone_model, img_shape, n_output_classes=80, lr=1e-4):
         self.backbone_model = backbone_model
         self.lr = lr
         self.input_bockbone = tf.keras.Input(shape=backbone_model.input.shape[1:], dtype=tf.float32,
@@ -17,7 +17,7 @@ class RoI:
         shape1 = tf.shape(proposal_boxes, out_type=tf.int32)
         n_boxes = tf.gather_nd(shape1, [0])
         indices = tf.zeros(shape=n_boxes, dtype=tf.int32)  # only input 1 image, all indices are 0
-        img_shape_constant = tf.constant([IMG_SHAPE[0], IMG_SHAPE[1], IMG_SHAPE[0], IMG_SHAPE[1]], tf.float32)
+        img_shape_constant = tf.constant([img_shape[0], img_shape[1], img_shape[0], img_shape[1]], tf.float32)
         proposal_boxes2 = tf.math.divide(proposal_boxes, img_shape_constant)
 
         image_crop = tf.image.crop_and_resize(feature_map, proposal_boxes2, indices, [7, 7])
@@ -30,9 +30,9 @@ class RoI:
                                                outputs=[class_header, box_reg_header],
                                                name='RoI_HEADER_MODEL')
         backbone_out = self.backbone_model(self.input_bockbone)
-        RoI_with_backbone_out1, RoI_with_backbone_out2 = self.RoI_header_model([backbone_out, proposal_boxes])
+        ro_i_with_backbone_out1, ro_i_with_backbone_out2 = self.RoI_header_model([backbone_out, proposal_boxes])
         self.RoI_with_backbone_model = tf.keras.Model(inputs=[self.input_bockbone, proposal_boxes],
-                                                      outputs=[RoI_with_backbone_out1, RoI_with_backbone_out2])
+                                                      outputs=[ro_i_with_backbone_out1, ro_i_with_backbone_out2])
 
         # --- for train step ---
         self.huber = tf.keras.losses.Huber()
@@ -68,5 +68,5 @@ class RoI:
 
 if __name__ == '__main__':
     b1 = Backbone()
-    t1 = RoI(b1.backbone_model, IMG_SHAPE=(800, 1333, 3))
+    t1 = RoI(b1.backbone_model, img_shape=(800, 1333, 3))
     t1.visualize_model()

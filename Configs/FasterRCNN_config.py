@@ -19,9 +19,7 @@ class Param:
     # --- RPN ---
     PATH_MODEL = 'SavedModels'
     PATH_DEBUG_IMG = 'SavedDebugImages'
-    LR = 0.0001         # Currently, it doesn't work when lr > 0.0001
     LAMBDA_FACTOR = 1   # Don't change now! This factor is for balancing the RPN losses. 1 is the best now!!
-    EPOCH = 12
     IMG_ORIGINAL_SHAPE = (720, 1280, 3)
     IMG_RESIZED_SHAPE = (800, 1333, 3)
 
@@ -32,7 +30,13 @@ class Param:
     # --- RoI ---
     N_OUT_CLASS = 80
 
+    # --- Train ---
+    LR = 0.0001         # Currently, it doesn't work when lr > 0.0001
+    EPOCH = 12
 
-    DATA_JSON_FILE = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017_sample.json'
-    PATH_IMAGES = '/media/liushuzhi/HDD500/Dataset/COCO2017/val2017'
+    # --- File and Directory ---
+    # DATA_JSON_FILE = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017_sample.json'
+    # PATH_IMAGES = '/media/liushuzhi/HDD500/Dataset/COCO2017/val2017'
+    DATA_JSON_FILE = '/media/liushuzhi/HDD500/mmdetection_tools/data/1988605221046/annotations/train.json'
+    PATH_IMAGES = '/media/liushuzhi/HDD500/mmdetection_tools/LocalData_Images'
 

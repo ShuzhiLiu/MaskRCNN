@@ -46,9 +46,9 @@ class RPN:
                                                outputs=[self.RPN_Anchor_Pred, self.RPN_BBOX_Regression_Pred],
                                                name='RPN_HEADER_MODEL')
         backbone_out = backbone_model(self.input_backbone)
-        RPN_Anchor_Pred, RPN_BBOX_Regression_Pred = self.RPN_header_model(backbone_out)
+        rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN_header_model(backbone_out)
         self.RPN_with_backbone_model = tf.keras.Model(inputs=[self.input_backbone],
-                                                      outputs=[RPN_Anchor_Pred, RPN_BBOX_Regression_Pred],
+                                                      outputs=[rpn_anchor_pred, rpn_bbox_regression_pred],
                                                       name='RPN_BACKBONE_MODEL')
 
         self.shape_Anchor_Target = self.RPN_header_model.get_layer(
@@ -65,9 +65,9 @@ class RPN:
         tf.keras.utils.plot_model(model=self.RPN_header_model, to_file='RPN_header_model.png', show_shapes=True)
         tf.keras.utils.plot_model(model=self.RPN_with_backbone_model, to_file='RPN_with_backbone.png', show_shapes=True)
 
-        self._RPN_train_model()
+        self._rpn_train_model()
 
-    def _RPN_train_model(self):
+    def _rpn_train_model(self):
         self.RPN_Anchor_Target = tf.keras.Input(shape=self.shape_Anchor_Target, name='RPN_Anchor_Target')
         self.RPN_BBOX_Regression_Target = tf.keras.Input(shape=self.shape_BBOX_Regression,
                                                          name='RPN_BBOX_Regression_Target')
@@ -76,7 +76,7 @@ class RPN:
                                                       self.RPN_BBOX_Regression_Target],
                                               outputs=[self.RPN_with_backbone_model.outputs],
                                               name='RPN_train_model')
-        self.RPN_train_model.add_loss(losses=self._RPN_loss(anchor_target=self.RPN_Anchor_Target,
+        self.RPN_train_model.add_loss(losses=self._rpn_loss(anchor_target=self.RPN_Anchor_Target,
                                                             bbox_reg_target=self.RPN_BBOX_Regression_Target,
                                                             anchor_pred=self.RPN_with_backbone_model.outputs[0],
                                                             bbox_reg_pred=self.RPN_with_backbone_model.outputs[
@@ -85,7 +85,7 @@ class RPN:
 
         tf.keras.utils.plot_model(model=self.RPN_train_model, to_file='RPN_train_model.png', show_shapes=True)
 
-    def _RPN_loss(self, anchor_target, bbox_reg_target, anchor_pred, bbox_reg_pred):
+    def _rpn_loss(self, anchor_target, bbox_reg_target, anchor_pred, bbox_reg_pred):
         # shape of input anchor_target: (batch_size=1, h, w, n_anchors)
         # currently only support batch size = 1
         bbox_inside_weight = tf.zeros(
@@ -134,8 +134,8 @@ class RPN:
 
         anchor_loss = tf.losses.categorical_crossentropy(y_true=anchor_target, y_pred=anchor_pred)
         anchor_loss = tf.math.reduce_mean(anchor_loss)
-        Huberloss = tf.losses.Huber()
-        bbox_reg_loss = Huberloss(y_true=bbox_reg_target, y_pred=bbox_reg_pred)
+        huber_loss = tf.losses.Huber()
+        bbox_reg_loss = huber_loss(y_true=bbox_reg_target, y_pred=bbox_reg_pred)
         bbox_reg_loss = tf.math.reduce_mean(bbox_reg_loss)
         bbox_reg_loss = tf.math.multiply(bbox_reg_loss, self.LAMBDA_FACTOR)
         total_loss = tf.add(anchor_loss, bbox_reg_loss)
@@ -146,7 +146,7 @@ class RPN:
     def train_step_with_backbone(self, image, anchor_target, box_reg_target):
         with tf.GradientTape() as backbone_tape:
             anchor_pred, box_reg_pred = self.RPN_with_backbone_model(image)
-            total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
+            total_loss = self._rpn_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
         gradients_backbone = backbone_tape.gradient(total_loss, self.RPN_with_backbone_model.trainable_variables)
         self.optimizer_with_backbone.apply_gradients(
             zip(gradients_backbone, self.RPN_with_backbone_model.trainable_variables))
@@ -155,7 +155,7 @@ class RPN:
     def train_step_header(self, image, anchor_target, box_reg_target):
         with tf.GradientTape() as header_tape:
             anchor_pred, box_reg_pred = self.RPN_with_backbone_model(image)
-            total_loss = self._RPN_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
+            total_loss = self._rpn_loss(anchor_target, box_reg_target, anchor_pred, box_reg_pred)
         gradients_header = header_tape.gradient(total_loss, self.RPN_header_model.trainable_variables)
         self.optimizer_header.apply_gradients(zip(gradients_header, self.RPN_header_model.trainable_variables))
 
