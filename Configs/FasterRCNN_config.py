@@ -1,4 +1,6 @@
 import numpy as np
+
+
 class Param:
     # === can't change now ===
     N_STAGE = 5
@@ -19,7 +21,7 @@ class Param:
     # --- RPN ---
     PATH_MODEL = 'SavedModels'
     PATH_DEBUG_IMG = 'SavedDebugImages'
-    LAMBDA_FACTOR = 1   # Don't change now! This factor is for balancing the RPN losses. 1 is the best now!!
+    LAMBDA_FACTOR = 1  # Don't change now! This factor is for balancing the RPN losses. 1 is the best now!!
     IMG_ORIGINAL_SHAPE = (720, 1280, 3)
     IMG_RESIZED_SHAPE = (800, 1333, 3)
 
@@ -31,7 +33,7 @@ class Param:
     N_OUT_CLASS = 80
 
     # --- Train ---
-    LR = 0.0001         # Currently, it doesn't work when lr > 0.0001
+    LR = 0.0001  # Currently, it doesn't work when lr > 0.0001
     EPOCH = 12
 
     # --- File and Directory ---
@@ -39,4 +41,3 @@ class Param:
     # PATH_IMAGES = '/media/liushuzhi/HDD500/Dataset/COCO2017/val2017'
     DATA_JSON_FILE = '/media/liushuzhi/HDD500/mmdetection_tools/data/1988605221046/annotations/train.json'
     PATH_IMAGES = '/media/liushuzhi/HDD500/mmdetection_tools/LocalData_Images'
-

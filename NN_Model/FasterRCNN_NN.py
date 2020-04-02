@@ -16,23 +16,20 @@ os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'  # for mac os tensorflow setting
 
 class FasterRCNN():
     def __init__(self):
-        b1 = Backbone(img_shape=Param.IMG_RESIZED_SHAPE, n_stage=Param.N_STAGE)
+        self.Backbone = Backbone(img_shape=Param.IMG_RESIZED_SHAPE, n_stage=Param.N_STAGE)
         self.IMG_SHAPE = Param.IMG_RESIZED_SHAPE
-        self.backbone_model = b1.backbone_model
         # self.backbone_model.trainable= False
         # === RPN part ===
-        self.RPN = RPN(backbone_model=self.backbone_model,
+        self.RPN = RPN(backbone_model=self.Backbone.backbone_model,
                        lambda_factor=Param.LAMBDA_FACTOR,
                        batch=Param.BATCH_RPN,
                        lr=Param.LR)
-        self.RPN_model = self.RPN.RPN_with_backbone_model
 
         # === RoI part ===
-        self.RoI = RoI(backbone_model=self.backbone_model,
+        self.RoI = RoI(backbone_model=self.Backbone.backbone_model,
                        img_shape=self.IMG_SHAPE,
                        n_output_classes=Param.N_OUT_CLASS,
                        lr=Param.LR)
-        self.RoI_with_backbone_model = self.RoI.RoI_with_backbone_model
         self.RoI_header = self.RoI.RoI_header_model
 
         # === Data part ===
@@ -106,14 +103,18 @@ class FasterRCNN():
         # return final_box
 
     def faster_rcnn_output(self):
+        # === prepare input images ===
         image_ids = self.train_data_generator.dataset_coco.image_ids
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(image_ids[0])
         print(inputs.shape, anchor_targets.shape, bbox_reg_targets.shape)
         image = np.reshape(inputs[0, :, :, :], (1, self.IMG_SHAPE[0], self.IMG_SHAPE[1], 3))
-        rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN_model(image)
+        # === get proposed region boxes ===
+        rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN.process_image(image)
         proposed_boxes = self._proposal_boxes(rpn_anchor_pred, rpn_bbox_regression_pred,
                                               self.anchor_candidates)
-        pred_class, pred_box_reg = self.RoI_with_backbone_model([image, proposed_boxes])
+        # === processing boxes with RoI header ===
+        pred_class, pred_box_reg = self.RoI.process_image([image, proposed_boxes])
+        # === processing the results ===
         pred_class_sparse = np.argmax(a=pred_class, axis=1)
         pred_class_sparse_value = np.max(a=pred_class, axis=1)
         print(pred_class, pred_box_reg)
@@ -145,7 +146,7 @@ class FasterRCNN():
         inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(image_ids[0])
         print(inputs.shape, anchor_targets.shape, bbox_reg_targets.shape)
         input1 = np.reshape(inputs[0, :, :, :], (1, self.IMG_SHAPE[0], self.IMG_SHAPE[1], 3))
-        rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN_model.predict(input1, batch_size=1)
+        rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN.process_image(input1)
         print(rpn_anchor_pred.shape, rpn_bbox_regression_pred.shape)
 
         # === Selection part ===
@@ -244,36 +245,36 @@ class FasterRCNN():
         print(input_images2.shape)
         target_anchor_bboxes2 = target_anchor_bboxes[:1].astype(np.float)
         print(target_anchor_bboxes2.shape)
-        class_header, box_reg_header = self.RoI_with_backbone_model.predict([input_images2, target_anchor_bboxes2])
+        class_header, box_reg_header = self.RoI.process_image([input_images2, target_anchor_bboxes2])
         print(class_header.shape, box_reg_header.shape)
         print(class_header)
 
     def nms_loop_np(self, boxes):
         # boxes : (N, 4), box_1target : (4,)
         # box axis format: (x1,y1,x2,y2)
-        # boxes = boxes.astype(np.float)
+
         box_1target = np.ones(shape=boxes.shape)
         zeros = np.zeros(shape=boxes.shape)
         box_1target = box_1target * boxes[0, :]
         box_b_area = (box_1target[:, 2] - box_1target[:, 0] + 1) * (box_1target[:, 3] - box_1target[:, 1] + 1)
-        # determine the (x, y)-coordinates of the intersection rectangle
+        # --- determine the (x, y)-coordinates of the intersection rectangle ---
         x_a = np.max(np.array([boxes[:, 0], box_1target[:, 0]]), axis=0)
         y_a = np.max(np.array([boxes[:, 1], box_1target[:, 1]]), axis=0)
         x_b = np.min(np.array([boxes[:, 2], box_1target[:, 2]]), axis=0)
         y_b = np.min(np.array([boxes[:, 3], box_1target[:, 3]]), axis=0)
 
-        # compute the area of intersection rectangle
+        # --- compute the area of intersection rectangle ---
         inter_area = np.max(np.array([zeros[:, 0], x_b - x_a + 1]), axis=0) * np.max(
             np.array([zeros[:, 0], y_b - y_a + 1]),
             axis=0)
 
-        # compute the area of both the prediction and ground-truth
+        # --- compute the area of both the prediction and ground-truth ---
         # rectangles
         box_a_area: Union[int, Any] = (boxes[:, 2] - boxes[:, 0] + 1) * (boxes[:, 3] - boxes[:, 1] + 1)
 
         # compute the intersection over union by taking the intersection
         # area and dividing it by the sum of prediction + ground-truth
-        # areas - the interesection area
+        # areas - the intersection area
         ious = (inter_area / (box_a_area + box_b_area - inter_area))
 
         # return the intersection over union value
@@ -298,8 +299,9 @@ class FasterRCNN():
                 inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(image_id)
                 self.RPN.train_step_with_backbone(inputs, anchor_targets, bbox_reg_targets)
                 # --- train RoI ---
-                input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_roi_one(
-                    image_id, self.train_data_generator.gen_candidate_anchors.anchor_candidates_list)
+                input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = \
+                    self.train_data_generator.gen_train_data_roi_one(
+                        image_id, self.train_data_generator.gen_candidate_anchors.anchor_candidates_list)
                 n_box = input_img.shape[0]
                 # --- train RoI header first ---
                 for j in range(n_box):
@@ -307,39 +309,41 @@ class FasterRCNN():
                                                target_class[j:j + 1], target_bbox_reg[j:j + 1])
                 # --- train RoI with backbone once, balance with the RPN train ---
                 j = random.randint(a=0,
-                                   b=n_box - 1)  # model with backbone only be trained once to balance RPN and RoI training
+                                   b=n_box - 1)
+                # model with backbone only be trained once to balance RPN and RoI training
                 self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
                                                   target_class[j:j + 1], target_bbox_reg[j:j + 1])
 
                 # --- train RoI with RPN proposed boxes ---
                 if epoch > 10:
-                    rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN_model(input_img[:1])
+                    rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN.process_image(input_img[:1])
                     proposed_boxes = self._proposal_boxes(rpn_anchor_pred, rpn_bbox_regression_pred,
                                                           self.anchor_candidates)
                     if len(list(proposed_boxes.tolist())) == 0:
                         continue
-                    input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = self.train_data_generator.gen_train_data_roi_one(
-                        image_id, proposed_boxes.tolist())
+                    input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = \
+                        self.train_data_generator.gen_train_data_roi_one(
+                            image_id, proposed_boxes.tolist())
                     for j in range(n_box):
                         self.RoI.train_step_header(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
                                                    target_class[j:j + 1], target_bbox_reg[j:j + 1])
 
     def save_weight(self):
-        self.RPN_model.save_weights(filepath=f"{Param.PATH_MODEL}/RPN_model")
-        self.RoI_header.save_weights(filepath=f"{Param.PATH_MODEL}/RoI_header_model")
-        self.backbone_model.save_weights(filepath=f"{Param.PATH_MODEL}/backbone_model")
+        self.RPN.save_model(Param.PATH_MODEL)
+        self.RoI.save_header(Param.PATH_MODEL)
+        self.Backbone.save_weight(Param.PATH_MODEL)
 
     def load_weight(self):
-        self.RPN_model.load_weights(filepath=f"{Param.PATH_MODEL}/RPN_model")
-        self.RoI_header.load_weights(filepath=f"{Param.PATH_MODEL}/RoI_header_model")
-        self.backbone_model.load_weights(filepath=f"{Param.PATH_MODEL}/backbone_model")
+        self.RPN.load_model(Param.PATH_MODEL)
+        self.RoI.load_header(Param.PATH_MODEL)
+        self.Backbone.load_weight(Param.PATH_MODEL)
 
 
 if __name__ == '__main__':
     f1 = FasterRCNN()
 
-    # f1.train_RPN_RoI()
-    # f1.save_weight()
+    f1.train_rpn_roi()
+    f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
     f1.faster_rcnn_output()

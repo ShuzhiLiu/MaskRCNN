@@ -1,0 +1,6 @@
+cython
+tensorflow
+opencv-python
+matplotlib
+pycococreatortools @ git+git://github.com/waspinator/pycococreator.git@0.2.0
+pycocotools

@@ -61,7 +61,17 @@ class RPN:
         self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
         self.optimizer_header = tf.keras.optimizers.Adam(self.lr)
 
-    def visualize_model(self):
+    def process_image(self, img):
+        rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN_with_backbone_model.predict(img)
+        return rpn_anchor_pred, rpn_bbox_regression_pred
+
+    def save_model(self, root_path):
+        self.RPN_with_backbone_model.save_weights(filepath=f"{root_path}/RPN_model")
+
+    def load_model(self, root_path):
+        self.RPN_with_backbone_model.load_weights(filepath=f"{root_path}/RPN_model")
+
+    def plot_model(self):
         tf.keras.utils.plot_model(model=self.RPN_header_model, to_file='RPN_header_model.png', show_shapes=True)
         tf.keras.utils.plot_model(model=self.RPN_with_backbone_model, to_file='RPN_with_backbone.png', show_shapes=True)
 
@@ -163,4 +173,4 @@ class RPN:
 if __name__ == '__main__':
     b1 = Backbone()
     t1 = RPN(b1.backbone_model)
-    t1.visualize_model()
+    t1.plot_model()

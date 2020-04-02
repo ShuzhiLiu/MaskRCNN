@@ -57,10 +57,6 @@ class Backbone:
         elif n_stage == 5:
             self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[self.base_model.output],
                                                  name='BACKBONE_MODEL')
-        # conv1 = tf.keras.layers.Conv2D(filters=256, kernel_size=(1, 1), padding='same')(self.base_model.output)
-        # bh1 = tf.keras.layers.BatchNormalization()(conv1)
-        # ac1 = tf.keras.layers.Activation(activation=tf.keras.activations.relu)(bh1)
-        # self.backbone_model = tf.keras.Model(inputs=[self.base_model.input], outputs=[ac1],name='BACKBONE_MODEL')
 
     def visualize_model(self):
         tf.keras.utils.plot_model(model=self.backbone_model, to_file='base_model_modified.png', show_shapes=True)
@@ -68,11 +64,11 @@ class Backbone:
     def get_output_shape(self):
         return self.backbone_model.layers[-1].output_shape[1:]  # first dim is batch size
 
-    def save_weight(self):
-        self.backbone_model.save_weights(filepath='SavedWeights/Backbone.ckpt')
+    def save_weight(self, root_path):
+        self.backbone_model.save_weights(filepath=f"{root_path}/backbone_model")
 
-    def load_weight(self):
-        self.backbone_model.load_weights(filepath='SavedWeights/Backbone.ckpt')
+    def load_weight(self, root_path):
+        self.backbone_model.load_weights(filepath=f"{root_path}/backbone_model")
 
 
 if __name__ == '__main__':

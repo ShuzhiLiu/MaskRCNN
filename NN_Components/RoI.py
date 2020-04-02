@@ -1,5 +1,3 @@
-from Debugger import debug_print
-import numpy as np
 import tensorflow as tf
 from NN_Components import Backbone
 
@@ -39,7 +37,17 @@ class RoI:
         self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
         self.optimizer_header = tf.keras.optimizers.Adam(self.lr)
 
-    def visualize_model(self):
+    def save_header(self, root_path):
+        self.RoI_header_model.save_weights(filepath=f"{root_path}/RoI_header_model")
+
+    def load_header(self, root_path):
+        self.RoI_header_model.load_weights(filepath=f"{root_path}/RoI_header_model")
+
+    def process_image(self, input_img_box):
+        pred_class, pred_box_reg = self.RoI_with_backbone_model(input_img_box)
+        return pred_class, pred_box_reg
+
+    def plot_model(self):
         tf.keras.utils.plot_model(self.RoI_header_model, 'RoI_header_model.png', show_shapes=True)
         tf.keras.utils.plot_model(self.RoI_with_backbone_model, 'RoI_with_backbone_model.png', show_shapes=True)
 
@@ -69,4 +77,4 @@ class RoI:
 if __name__ == '__main__':
     b1 = Backbone()
     t1 = RoI(b1.backbone_model, img_shape=(800, 1333, 3))
-    t1.visualize_model()
+    t1.plot_model()
