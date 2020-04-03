@@ -290,8 +290,14 @@ class FasterRCNN():
                 # --- train RoI with RPN proposed boxes ---
                 if epoch > 10:
                     rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN.process_image(input_img[:1])
-                    proposed_boxes = self._proposal_boxes(rpn_anchor_pred, rpn_bbox_regression_pred,
-                                                          self.anchor_candidates)
+                    proposed_boxes = self.RPN._proposal_boxes(rpn_anchor_pred, rpn_bbox_regression_pred,
+                                                              self.anchor_candidates,
+                                                              self.anchor_candidate_generator.h,
+                                                              self.anchor_candidate_generator.w,
+                                                              self.anchor_candidate_generator.n_anchors,
+                                                              Param.ANCHOR_PROPOSAL_N,
+                                                              Param.ANCHOR_THRESHOLD
+                                                              )
                     if len(list(proposed_boxes.tolist())) == 0:
                         continue
                     input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = \
