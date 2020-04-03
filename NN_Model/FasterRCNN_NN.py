@@ -8,11 +8,10 @@ from Debugger import debug_print
 from Configs.FasterRCNN_config import Param
 import os
 import random
+import json
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'  # for mac os tensorflow setting
 
-
-# tf.keras.backend.set_floatx('float64')
 
 class FasterRCNN():
     def __init__(self):
@@ -62,46 +61,6 @@ class FasterRCNN():
         loss = self.RPN._rpn_loss(anchor1, bbox1, anchor2, bbox1)
         print(loss)
 
-    def _proposal_boxes(self, rpn_anchor_pred, rpn_bbox_regression_pred, anchor_candidates):
-        # === Selection part ===
-        # top_values, top_indices = tf.math.top_k()
-        rpn_anchor_pred = tf.slice(rpn_anchor_pred, [0, 0, 0, 0, 1], [1,
-                                                                      self.anchor_candidate_generator.h,
-                                                                      self.anchor_candidate_generator.w,
-                                                                      self.anchor_candidate_generator.n_anchors,
-                                                                      1])  # second channel is foreground
-        # squeeze the pred of anchor and bbox_reg
-        rpn_anchor_pred = tf.squeeze(rpn_anchor_pred)
-        rpn_bbox_regression_pred = tf.squeeze(rpn_bbox_regression_pred)
-        shape1 = tf.shape(rpn_anchor_pred)
-        # flatten the pred of anchor to get top N values and indices
-        rpn_anchor_pred = tf.reshape(rpn_anchor_pred, (-1,))
-        n_anchor_proposal = Param.ANCHOR_PROPOSAL_N
-        top_values, top_indices = tf.math.top_k(rpn_anchor_pred,
-                                                n_anchor_proposal)  # top_k has sort function. it's important here
-        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, Param.ANCHOR_THRESHOLD)))
-        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, Param.ANCHOR_THRESHOLD)))
-
-        top_indices = tf.reshape(top_indices, (-1, 1))
-        update_value = tf.math.add(top_values, 1)
-        rpn_anchor_pred = tf.tensor_scatter_nd_update(rpn_anchor_pred, top_indices, update_value)
-        rpn_anchor_pred = tf.reshape(rpn_anchor_pred, shape1)
-
-        # --- find the base boxes ---
-        anchor_pred_top_indices = tf.where(tf.greater(rpn_anchor_pred, 1))
-        base_boxes = tf.gather_nd(anchor_candidates, anchor_pred_top_indices)
-
-        # --- find the bbox_regs ---
-        # flatten the bbox_reg by last dim to use top_indices to get final_box_reg
-        rpn_bbox_regression_pred_shape = tf.shape(rpn_bbox_regression_pred)
-        rpn_bbox_regression_pred = tf.reshape(rpn_bbox_regression_pred, (-1, rpn_bbox_regression_pred_shape[-1]))
-        final_box_reg = tf.gather_nd(rpn_bbox_regression_pred, top_indices)
-
-        # Convert to numpy to plot
-        final_box = BboxToolsTf.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
-        return np.array(final_box).astype(np.float)
-        # return final_box
-
     def faster_rcnn_output(self):
         # === prepare input images ===
         image_ids = self.train_data_generator.dataset_coco.image_ids
@@ -110,21 +69,39 @@ class FasterRCNN():
         image = np.reshape(inputs[0, :, :, :], (1, self.IMG_SHAPE[0], self.IMG_SHAPE[1], 3))
         # === get proposed region boxes ===
         rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN.process_image(image)
-        proposed_boxes = self._proposal_boxes(rpn_anchor_pred, rpn_bbox_regression_pred,
-                                              self.anchor_candidates)
+        proposed_boxes = self.RPN._proposal_boxes(rpn_anchor_pred, rpn_bbox_regression_pred,
+                                                  self.anchor_candidates,
+                                                  self.anchor_candidate_generator.h,
+                                                  self.anchor_candidate_generator.w,
+                                                  self.anchor_candidate_generator.n_anchors,
+                                                  Param.ANCHOR_PROPOSAL_N,
+                                                  Param.ANCHOR_THRESHOLD
+                                                  )
         # === processing boxes with RoI header ===
         pred_class, pred_box_reg = self.RoI.process_image([image, proposed_boxes])
         # === processing the results ===
-        pred_class_sparse = np.argmax(a=pred_class, axis=1)
-        pred_class_sparse_value = np.max(a=pred_class, axis=1)
+        pred_class_sparse = np.argmax(a=pred_class[:, :], axis=1)
+        pred_class_sparse_value = np.max(a=pred_class[:, :], axis=1)
         print(pred_class, pred_box_reg)
         print(pred_class_sparse, pred_class_sparse_value)
         print(np.max(proposed_boxes), np.max(pred_box_reg))
         final_box = BboxTools.bbox_reg2truebox(base_boxes=proposed_boxes, regs=pred_box_reg)
         final_box = BboxTools.clip_boxes(final_box, self.IMG_SHAPE)
-        print(final_box)
-        print(final_box[pred_class_sparse_value > 0.8])
-        final_box = final_box[pred_class_sparse_value > 0.8]
+        # === output to official coco bbox result json file ===
+        temp_output_to_file = []
+        for i in range(pred_class_sparse.shape[0]):
+            temp_category = self.train_data_generator.dataset_coco.get_category_from_sparse(pred_class_sparse[i])
+            temp_output_to_file.append({
+                "image_id": f"{image_ids[0]}",
+                "bbox": [final_box[i][0].item(),final_box[i][1].item(),final_box[i][2].item(),final_box[i][3].item()],
+                "score": pred_class_sparse_value[i].item(),
+                "category": f"{temp_category}"
+            })
+        with open("results.pkl.bbox.json", "w") as f:
+            json.dump(temp_output_to_file, f, indent=4)
+        # print(final_box)
+        print(final_box[pred_class_sparse_value > 0.9])
+        final_box = final_box[pred_class_sparse_value > 0.9]
         self.cocotool.draw_bboxes(original_image=image[0], bboxes=final_box.tolist(), show=True, save_file=True,
                                   path=Param.PATH_DEBUG_IMG, save_name='6PredRoISBoxes')
 
@@ -280,39 +257,35 @@ class FasterRCNN():
         # return the intersection over union value
         return ious
 
-    def nms_loop_tf(self, boxes):
-        ious = tf.numpy_function(func=self.nms_loop_np, inp=[boxes], Tout=tf.float32)
-
     def train_rpn_roi(self, ):
         # TODO: use the output of RPN to train RoI
         image_ids = self.train_data_generator.dataset_coco.image_ids
         for epoch in range(Param.EPOCH):
             print(f'epoch : {epoch}')
             temp_image_ids = random.choices(population=image_ids, weights=None, k=8)
-            # --- train RPN header first ---
-            for image_id in temp_image_ids:
-                inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(image_id)
-                self.RPN.train_step_header(inputs, anchor_targets, bbox_reg_targets)
+
             for image_id in image_ids:
-                # print(f'{i} th image')
-                # --- train RPN with backbone---
-                inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(image_id)
-                self.RPN.train_step_with_backbone(inputs, anchor_targets, bbox_reg_targets)
                 # --- train RoI ---
                 input_img, input_box_filtered_by_iou, target_class, target_bbox_reg = \
                     self.train_data_generator.gen_train_data_roi_one(
                         image_id, self.train_data_generator.gen_candidate_anchors.anchor_candidates_list)
                 n_box = input_img.shape[0]
-                # --- train RoI header first ---
+                # --- train RoI with backbone once, balance with the RPN train ---
+                # j = random.randint(a=0,
+                #                    b=n_box - 1)
+                # model with backbone only be trained once to balance RPN and RoI training
+                for j in range(n_box):
+                    self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
+                                                      target_class[j:j + 1], target_bbox_reg[j:j + 1])
+
+                # --- train RPN with backbone---
+                inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(image_id)
+                self.RPN.train_step_with_backbone(inputs, anchor_targets, bbox_reg_targets)
+
+                # --- train RoI header secondly ---
                 for j in range(n_box):
                     self.RoI.train_step_header(input_img[0:1], input_box_filtered_by_iou[j:j + 1],
                                                target_class[j:j + 1], target_bbox_reg[j:j + 1])
-                # --- train RoI with backbone once, balance with the RPN train ---
-                j = random.randint(a=0,
-                                   b=n_box - 1)
-                # model with backbone only be trained once to balance RPN and RoI training
-                self.RoI.train_step_with_backbone(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
-                                                  target_class[j:j + 1], target_bbox_reg[j:j + 1])
 
                 # --- train RoI with RPN proposed boxes ---
                 if epoch > 10:
@@ -328,6 +301,12 @@ class FasterRCNN():
                         self.RoI.train_step_header(input_img[j:j + 1], input_box_filtered_by_iou[j:j + 1],
                                                    target_class[j:j + 1], target_bbox_reg[j:j + 1])
 
+            # --- train RPN header first ---
+            for image_id in image_ids:
+                inputs, anchor_targets, bbox_reg_targets = self.train_data_generator.gen_train_data_rpn_one(
+                    image_id)
+                self.RPN.train_step_header(inputs, anchor_targets, bbox_reg_targets)
+
     def save_weight(self):
         self.RPN.save_model(Param.PATH_MODEL)
         self.RoI.save_header(Param.PATH_MODEL)
@@ -342,8 +321,8 @@ class FasterRCNN():
 if __name__ == '__main__':
     f1 = FasterRCNN()
 
-    f1.train_rpn_roi()
-    f1.save_weight()
+    # f1.train_rpn_roi()
+    # f1.save_weight()
     f1.load_weight()
     f1.test_proposal_visualization()
     f1.faster_rcnn_output()

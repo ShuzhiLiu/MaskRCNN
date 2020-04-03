@@ -18,7 +18,8 @@ class RoI:
         img_shape_constant = tf.constant([img_shape[0], img_shape[1], img_shape[0], img_shape[1]], tf.float32)
         proposal_boxes2 = tf.math.divide(proposal_boxes, img_shape_constant)
 
-        image_crop = tf.image.crop_and_resize(feature_map, proposal_boxes2, indices, [7, 7])
+        image_crop = tf.image.crop_and_resize(image=feature_map, boxes=proposal_boxes2,
+                                              box_indices=indices, crop_size=[7, 7])
         flatten1 = tf.keras.layers.GlobalAveragePooling2D()(image_crop)
         fc1 = tf.keras.layers.Dense(units=1024, activation='relu')(flatten1)
         class_header = tf.keras.layers.Dense(units=n_output_classes + 1, activation='softmax')(fc1)

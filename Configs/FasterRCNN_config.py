@@ -34,10 +34,8 @@ class Param:
 
     # --- Train ---
     LR = 0.0001  # Currently, it doesn't work when lr > 0.0001
-    EPOCH = 12
+    EPOCH = 15
 
     # --- File and Directory ---
-    # DATA_JSON_FILE = '/media/liushuzhi/HDD500/Dataset/COCO2017/annotations/instances_val2017_sample.json'
-    # PATH_IMAGES = '/media/liushuzhi/HDD500/Dataset/COCO2017/val2017'
-    DATA_JSON_FILE = '/media/liushuzhi/HDD500/mmdetection_tools/data/1988605221046/annotations/train.json'
-    PATH_IMAGES = '/media/liushuzhi/HDD500/mmdetection_tools/LocalData_Images'
+    DATA_JSON_FILE = ''
+    PATH_IMAGES = ''

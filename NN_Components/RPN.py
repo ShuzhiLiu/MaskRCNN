@@ -1,5 +1,6 @@
 import tensorflow as tf
 from NN_Components import Backbone
+from NN_Helper import BboxToolsTf
 import random
 import numpy as np
 from Debugger import debug_print
@@ -151,6 +152,46 @@ class RPN:
         total_loss = tf.add(anchor_loss, bbox_reg_loss)
 
         return total_loss
+
+    def _proposal_boxes(self, rpn_anchor_pred, rpn_bbox_regression_pred, anchor_candidates, h, w, n_anchors, n_proposal, anchor_threshold):
+        # === Selection part ===
+        # top_values, top_indices = tf.math.top_k()
+        rpn_anchor_pred = tf.slice(rpn_anchor_pred, [0, 0, 0, 0, 1], [1,
+                                                                      h,
+                                                                      w,
+                                                                      n_anchors,
+                                                                      1])  # second channel is foreground
+        # squeeze the pred of anchor and bbox_reg
+        rpn_anchor_pred = tf.squeeze(rpn_anchor_pred)
+        rpn_bbox_regression_pred = tf.squeeze(rpn_bbox_regression_pred)
+        shape1 = tf.shape(rpn_anchor_pred)
+        # flatten the pred of anchor to get top N values and indices
+        rpn_anchor_pred = tf.reshape(rpn_anchor_pred, (-1,))
+        n_anchor_proposal = n_proposal
+        top_values, top_indices = tf.math.top_k(rpn_anchor_pred,
+                                                n_anchor_proposal)  # top_k has sort function. it's important here
+        top_indices = tf.gather_nd(top_indices, tf.where(tf.greater(top_values, anchor_threshold)))
+        top_values = tf.gather_nd(top_values, tf.where(tf.greater(top_values, anchor_threshold)))
+
+        top_indices = tf.reshape(top_indices, (-1, 1))
+        update_value = tf.math.add(top_values, 1)
+        rpn_anchor_pred = tf.tensor_scatter_nd_update(rpn_anchor_pred, top_indices, update_value)
+        rpn_anchor_pred = tf.reshape(rpn_anchor_pred, shape1)
+
+        # --- find the base boxes ---
+        anchor_pred_top_indices = tf.where(tf.greater(rpn_anchor_pred, 1))
+        base_boxes = tf.gather_nd(anchor_candidates, anchor_pred_top_indices)
+
+        # --- find the bbox_regs ---
+        # flatten the bbox_reg by last dim to use top_indices to get final_box_reg
+        rpn_bbox_regression_pred_shape = tf.shape(rpn_bbox_regression_pred)
+        rpn_bbox_regression_pred = tf.reshape(rpn_bbox_regression_pred, (-1, rpn_bbox_regression_pred_shape[-1]))
+        final_box_reg = tf.gather_nd(rpn_bbox_regression_pred, top_indices)
+
+        # Convert to numpy to plot
+        final_box = BboxToolsTf.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
+        return np.array(final_box).astype(np.float)
+        # return final_box
 
     @tf.function
     def train_step_with_backbone(self, image, anchor_target, box_reg_target):

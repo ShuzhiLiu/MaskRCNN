@@ -156,6 +156,9 @@ class CocoTools:
                 categories_sparse.append(sparse)
         return categories_sparse
 
+    def get_category_from_sparse(self, num):
+        return self.sparse_onehot2category[num]
+
     def get_original_segms_mask_list(self, image_id):
         # TODO: put mask list to dictionary of labels
         height, width = self.get_image_shape(image_id)
