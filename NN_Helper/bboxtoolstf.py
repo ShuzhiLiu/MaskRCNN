@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+
 from NN_Helper import BboxTools
 
 
@@ -71,13 +72,14 @@ class BboxToolsTf:
 
 
 if __name__ == '__main__':
-    t1 = tf.constant([[10, 10, 20, 20]], dtype=tf.int32)
-    t2 = tf.constant([[5, 5, 35, 35]])
-    print(t1)
-    print(BboxToolsTf.xxyy2xywh(t1))
-    print(BboxToolsTf.xywh2xxyy(BboxToolsTf.xxyy2xywh(t1)))
-
-    print(BboxToolsTf.xxyy2xywh(t2))
-    print(BboxToolsTf.bbox_regression_target(t1, t2))
-    print(BboxToolsTf.bbox_reg2truebox(t1, BboxToolsTf.bbox_regression_target(t1, t2)))
-    print(BboxToolsTf.ious(t1, t2[0]))
+    pass
+    # t1 = tf.constant([[10, 10, 20, 20]], dtype=tf.int32)
+    # t2 = tf.constant([[5, 5, 35, 35]])
+    # print(t1)
+    # print(BboxToolsTf.xxyy2xywh(t1))
+    # print(BboxToolsTf.xywh2xxyy(BboxToolsTf.xxyy2xywh(t1)))
+    #
+    # print(BboxToolsTf.xxyy2xywh(t2))
+    # print(BboxToolsTf.bbox_regression_target(t1, t2))
+    # print(BboxToolsTf.bbox_reg2truebox(t1, BboxToolsTf.bbox_regression_target(t1, t2)))
+    # print(BboxToolsTf.ious(t1, t2[0]))

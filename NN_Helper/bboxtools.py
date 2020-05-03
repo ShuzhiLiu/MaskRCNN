@@ -5,11 +5,11 @@ class BboxTools:
     # Beside ious, format of boxes is numpy.
     # format of boxes is list for ious
     @classmethod
-    def ious(cls, boxes_list, box_1target):
+    def ious(cls, boxes: list, box_1target):
         # box axis format: (x1,y1,x2,y2)
         box_b_area = (box_1target[2] - box_1target[0] + 1) * (box_1target[3] - box_1target[1] + 1)
         ious = []
-        for box in boxes_list:
+        for box in boxes:
             # determine the (x, y)-coordinates of the intersection rectangle
             x_a = max(box[0], box_1target[0])
             y_a = max(box[1], box_1target[1])

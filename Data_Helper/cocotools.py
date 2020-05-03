@@ -1,22 +1,23 @@
 import json
-import numpy as np
+import os
+from copy import deepcopy
+
 import cv2
 import matplotlib.pyplot as plt
-import os
+import numpy as np
 from pycococreatortools import pycococreatortools
-from copy import deepcopy
 
 
 class CocoTools:
-    def __init__(self, json_file, image_folder_path, resized_shape=None):
+    def __init__(self, json_file: str, image_folder_path: str, resized_shape: tuple):
         self.segment_info = None
         self.load_anno_coco(json_file, image_folder_path)
         self.RESIZE_FLAG = False
         self.resized_shape = resized_shape
-        if resized_shape != None:
+        if not all(resized_shape):
             self.RESIZE_FLAG = True
 
-    def load_anno_coco(self, file, image_folder_path):
+    def load_anno_coco(self, file: str, image_folder_path: str):
         self.imagefolder_path = image_folder_path
         self.file = file
         with open(file, 'r') as f:
@@ -44,7 +45,12 @@ class CocoTools:
         for image_id in self.image_ids:
             original_shape = self.get_image_shape(image_id)
 
-    def draw_segm_from_anno_coco(self, image_id, original_image, annos, show=False, savefile=False):
+    def draw_segm_from_anno_coco(self,
+                                 image_id,
+                                 original_image,
+                                 annos: list,
+                                 show: bool = False,
+                                 save_file: bool = False):
         height, width = self.get_image_shape(image_id)
         if self.RESIZE_FLAG:
             height, width, _ = self.resized_shape
@@ -71,10 +77,16 @@ class CocoTools:
         plt.imshow(original_image)
         if show:
             plt.show()
-        if savefile:
+        if save_file:
             plt.savefig(f'{os.getcwd()}/Images_Drawn/{image_id}.jpg', dpi=300)
 
-    def draw_bboxes(self, original_image, bboxes, show=False, save_file=False, path=None, save_name=None):
+    def draw_bboxes(self,
+                    original_image,
+                    bboxes,
+                    show: bool = False,
+                    save_file: bool = False,
+                    path: str = "",
+                    save_name: str = ""):
         # bbox is numpy format (x1, y1, x2, y2)
         height, width = original_image.shape[0], original_image.shape[1]
         tempimg = np.zeros(shape=(height, width, 3), dtype=np.uint8)
@@ -156,7 +168,7 @@ class CocoTools:
                 categories_sparse.append(sparse)
         return categories_sparse
 
-    def get_category_from_sparse(self, num):
+    def get_category_from_sparse(self, num: int):
         return self.sparse_onehot2category[num]
 
     def get_original_segms_mask_list(self, image_id):

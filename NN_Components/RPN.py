@@ -1,13 +1,16 @@
-import tensorflow as tf
-from NN_Components import Backbone
-from NN_Helper import BboxToolsTf
-import random
 import numpy as np
-from Debugger import debug_print
+import tensorflow as tf
+
+from NN_Components import Backbone
+from NN_Helper import BboxTools
 
 
 class RPN:
-    def __init__(self, backbone_model, lambda_factor=1, batch=1, lr=1e-4):
+    def __init__(self,
+                 backbone_model,
+                 lambda_factor: int = 1,
+                 batch: int = 1,
+                 lr: float = 1e-4):
         self.LAMBDA_FACTOR = lambda_factor
         self.BATCH = batch
         self.lr = lr
@@ -66,10 +69,10 @@ class RPN:
         rpn_anchor_pred, rpn_bbox_regression_pred = self.RPN_with_backbone_model.predict(img)
         return rpn_anchor_pred, rpn_bbox_regression_pred
 
-    def save_model(self, root_path):
+    def save_model(self, root_path: str):
         self.RPN_with_backbone_model.save_weights(filepath=f"{root_path}/RPN_model")
 
-    def load_model(self, root_path):
+    def load_model(self, root_path: str):
         self.RPN_with_backbone_model.load_weights(filepath=f"{root_path}/RPN_model")
 
     def plot_model(self):
@@ -153,7 +156,15 @@ class RPN:
 
         return total_loss
 
-    def _proposal_boxes(self, rpn_anchor_pred, rpn_bbox_regression_pred, anchor_candidates, h, w, n_anchors, n_proposal, anchor_threshold):
+    def _proposal_boxes(self,
+                        rpn_anchor_pred,
+                        rpn_bbox_regression_pred,
+                        anchor_candidates,
+                        h: int,
+                        w: int,
+                        n_anchors: int,
+                        n_proposal: int,
+                        anchor_threshold: float):
         # === Selection part ===
         # top_values, top_indices = tf.math.top_k()
         rpn_anchor_pred = tf.slice(rpn_anchor_pred, [0, 0, 0, 0, 1], [1,
@@ -189,7 +200,7 @@ class RPN:
         final_box_reg = tf.gather_nd(rpn_bbox_regression_pred, top_indices)
 
         # Convert to numpy to plot
-        final_box = BboxToolsTf.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
+        final_box = BboxTools.bbox_reg2truebox(base_boxes=base_boxes, regs=final_box_reg)
         return np.array(final_box).astype(np.float)
         # return final_box
 

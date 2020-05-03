@@ -1,5 +1,4 @@
 import tensorflow as tf
-import inspect
 
 
 def backbone_test():
@@ -47,7 +46,7 @@ def backbone_test():
 
 
 class Backbone:
-    def __init__(self, img_shape=(800, 1333, 3), n_stage=5):
+    def __init__(self, img_shape: tuple = (800, 1333, 3), n_stage: int = 5):
         # the stages of other implementation is 4, note that this ResNet50V2 has 5!
         self.base_model = tf.keras.applications.ResNet50V2(input_shape=img_shape,
                                                            include_top=False)

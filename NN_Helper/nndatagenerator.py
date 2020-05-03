@@ -1,29 +1,31 @@
-import json
-import numpy as np
+import random
+
 import cv2 as cv
 import matplotlib.pyplot as plt
+import numpy as np
+
 from Data_Helper import CocoTools
-import random
 from NN_Helper import BboxTools, GenCandidateAnchors
-import tensorflow as tf
-from tensorflow.keras.utils import Sequence
 
 
 class NnDataGenerator():
-    def __init__(self, file, imagefolder_path,
-                 base_size,
-                 ratios,
+    def __init__(self,
+                 file: str,
+                 imagefolder_path: str,
+                 anchor_base_size: int,
+                 ratios: list,
                  scales,
-                 n_anchors,
-                 img_shape_resize=(800, 1333, 3), n_stage=5,
-                 threshold_iou_rpn=0.7,
-                 threshold_iou_roi=0.55
+                 n_anchors: int,
+                 img_shape_resize: tuple = (800, 1333, 3),
+                 n_stage: int = 5,
+                 threshold_iou_rpn: float = 0.7,
+                 threshold_iou_roi: float = 0.55
                  ):
         # TODO: complete the resize part of the data generator
         self.threshold_iou_rpn = threshold_iou_rpn
         self.threshold_iou_roi = threshold_iou_roi
         self.dataset_coco = CocoTools(file, imagefolder_path, img_shape_resize)
-        self.gen_candidate_anchors = GenCandidateAnchors(base_size=base_size, ratios=ratios, scales=scales,
+        self.gen_candidate_anchors = GenCandidateAnchors(base_size=anchor_base_size, ratios=ratios, scales=scales,
                                                          img_shape=img_shape_resize, n_stage=n_stage,
                                                          n_anchors=n_anchors)
         self.img_shape_resize = img_shape_resize
@@ -190,10 +192,10 @@ class NnDataGenerator():
 
 
 def test2():
-    base_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
-    imagefolder_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
-    dataset_id = '1940091026744'
-    image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
+    base_path = ''
+    imagefolder_path = ''
+    dataset_id = ''
+    image_id = ''
     t1 = NnDataGenerator(file=f"{base_path}/{dataset_id}/annotations/train.json",
                          imagefolder_path=imagefolder_path)
     bboxes = t1.dataset_coco.get_original_bboxes_list(image_id=image_id)
@@ -203,10 +205,10 @@ def test2():
 
 
 def test():
-    base_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/data'
-    imagefolder_path = '/Users/shuzhiliu/Google Drive/KyoceraRobotAI/mmdetection_tools/LocalData_Images'
-    dataset_id = '1940091026744'
-    image_id = '20191119T063709-cca043ed-32fe-4da0-ba75-e4a12b88eef4'
+    base_path = ''
+    imagefolder_path = ''
+    dataset_id = ''
+    image_id = ''
     data1 = CocoTools(json_file=f"{base_path}/{dataset_id}/annotations/train.json",
                       image_folder_path=imagefolder_path)
     img1 = data1.get_original_image(image_id=image_id)

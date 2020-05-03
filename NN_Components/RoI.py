@@ -1,9 +1,10 @@
 import tensorflow as tf
+
 from NN_Components import Backbone
 
 
 class RoI:
-    def __init__(self, backbone_model, img_shape, n_output_classes=80, lr=1e-4):
+    def __init__(self, backbone_model, img_shape, n_output_classes: int = 80, lr: float = 1e-4):
         self.backbone_model = backbone_model
         self.lr = lr
         self.input_bockbone = tf.keras.Input(shape=backbone_model.input.shape[1:], dtype=tf.float32,
@@ -38,10 +39,10 @@ class RoI:
         self.optimizer_with_backbone = tf.keras.optimizers.Adam(self.lr)
         self.optimizer_header = tf.keras.optimizers.Adam(self.lr)
 
-    def save_header(self, root_path):
+    def save_header(self, root_path: str):
         self.RoI_header_model.save_weights(filepath=f"{root_path}/RoI_header_model")
 
-    def load_header(self, root_path):
+    def load_header(self, root_path: str):
         self.RoI_header_model.load_weights(filepath=f"{root_path}/RoI_header_model")
 
     def process_image(self, input_img_box):

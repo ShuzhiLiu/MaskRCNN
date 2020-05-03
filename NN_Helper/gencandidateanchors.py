@@ -1,20 +1,22 @@
-from NN_Helper import GenBaseAnchors
-import numpy as np
+import random
+
 import cv2 as cv
 import matplotlib.pyplot as plt
-import random
+import numpy as np
+
 from Debugger import debug_print
+from NN_Helper import GenBaseAnchors
 
 
 class GenCandidateAnchors:
     def __init__(self,
-                 base_size=16,
-                 ratios=None,
+                 ratios: list,
+                 base_size: int = 16,
                  scales=2 ** np.arange(3, 6),
-                 img_shape=(800, 1333, 3),
-                 n_stage=5,
-                 n_anchors=9):
-        if ratios is None:
+                 img_shape: tuple = (800, 1333, 3),
+                 n_stage: int = 5,
+                 n_anchors: int = 9):
+        if not ratios:
             ratios = [0.5, 1, 2]
         self.img_shape = (img_shape[0], img_shape[1])
         self.n_stage_revert_factor = 2 ** n_stage
@@ -27,7 +29,7 @@ class GenCandidateAnchors:
         self.anchor_candidates = self.gen_all_candidate_anchors(self.h, self.w, self.n_anchors, self.img_shape)
         self.anchor_candidates_list = list(np.reshape(self.anchor_candidates, newshape=(-1, 4)).tolist())
 
-    def gen_all_candidate_anchors(self, h, w, num_anchors, image_shape):
+    def gen_all_candidate_anchors(self, h: int, w: int, num_anchors: int, image_shape: tuple):
         anchors = np.zeros(shape=(h, w, num_anchors, 4), dtype=np.int)
         # anchors axis format: (x1, y1, x2, y2)
         x_max = image_shape[0] - 1
@@ -58,7 +60,7 @@ class GenCandidateAnchors:
         plt.show()
 
 
-def get_feature_map_h_w_with_n_stages(img_shape, n_stage):
+def get_feature_map_h_w_with_n_stages(img_shape: tuple, n_stage: int):
     # here round up the number since the tensorflow conv2d round strategy
     n_stage_revert_factor = 2 ** n_stage
     h = int(img_shape[0] / n_stage_revert_factor) + int((img_shape[0] % n_stage_revert_factor) > 0)

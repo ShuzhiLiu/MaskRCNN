@@ -1,14 +1,15 @@
-from typing import Any, Union
-
-from NN_Components import Backbone, RPN, RoI
-import numpy as np
-from NN_Helper import NnDataGenerator, BboxTools, BboxToolsTf
-import tensorflow as tf
-from Debugger import debug_print
-from Configs.FasterRCNN_config import Param
+import json
 import os
 import random
-import json
+from typing import Any, Union
+
+import numpy as np
+import tensorflow as tf
+
+from Configs.FasterRCNN_config import Param
+from Debugger import debug_print
+from NN_Components import Backbone, RPN, RoI
+from NN_Helper import NnDataGenerator, BboxTools
 
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'  # for mac os tensorflow setting
 
@@ -35,7 +36,7 @@ class FasterRCNN():
         self.train_data_generator = NnDataGenerator(
             file=Param.DATA_JSON_FILE,
             imagefolder_path=Param.PATH_IMAGES,
-            base_size=Param.BASE_SIZE,
+            anchor_base_size=Param.BASE_SIZE,
             ratios=Param.RATIOS,
             scales=Param.SCALES,
             n_anchors=Param.N_ANCHORS,
@@ -93,7 +94,8 @@ class FasterRCNN():
             temp_category = self.train_data_generator.dataset_coco.get_category_from_sparse(pred_class_sparse[i])
             temp_output_to_file.append({
                 "image_id": f"{image_ids[0]}",
-                "bbox": [final_box[i][0].item(),final_box[i][1].item(),final_box[i][2].item(),final_box[i][3].item()],
+                "bbox": [final_box[i][0].item(), final_box[i][1].item(), final_box[i][2].item(),
+                         final_box[i][3].item()],
                 "score": pred_class_sparse_value[i].item(),
                 "category": f"{temp_category}"
             })
